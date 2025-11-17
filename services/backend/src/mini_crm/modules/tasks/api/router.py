@@ -1,22 +1,37 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from mini_crm.core.dependencies import get_request_context
+from mini_crm.core.dependencies import get_db_session, get_request_context
+from mini_crm.modules.activities.repositories.repository import AbstractActivityRepository
+from mini_crm.modules.activities.repositories.sqlalchemy import SQLAlchemyActivityRepository
 from mini_crm.modules.common.context import RequestContext
 from mini_crm.modules.tasks.dto.schemas import TaskCreate, TaskResponse
-from mini_crm.modules.tasks.repositories.repository import InMemoryTaskRepository
+from mini_crm.modules.tasks.repositories.repository import AbstractTaskRepository
+from mini_crm.modules.tasks.repositories.sqlalchemy import SQLAlchemyTaskRepository
 from mini_crm.modules.tasks.services.service import TaskService
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 
-_task_repository = InMemoryTaskRepository()
-_task_service = TaskService(repository=_task_repository)
+def get_task_repository(
+    session: AsyncSession = Depends(get_db_session),
+) -> AbstractTaskRepository:
+    return SQLAlchemyTaskRepository(session=session)
 
 
-def get_task_service() -> TaskService:
-    return _task_service
+def get_activity_repository(
+    session: AsyncSession = Depends(get_db_session),
+) -> AbstractActivityRepository:
+    return SQLAlchemyActivityRepository(session=session)
+
+
+def get_task_service(
+    repository: AbstractTaskRepository = Depends(get_task_repository),
+    activity_repository: AbstractActivityRepository = Depends(get_activity_repository),
+) -> TaskService:
+    return TaskService(repository=repository, activity_repository=activity_repository)
 
 
 @router.get("", response_model=list[TaskResponse])
