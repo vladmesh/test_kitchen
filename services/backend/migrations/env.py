@@ -15,6 +15,7 @@ sys.path.append(str(ROOT / "src"))
 
 from mini_crm.config.settings import get_settings  # noqa: E402
 from mini_crm.core.db import Base  # noqa: E402
+from mini_crm.modules import load_model_modules  # noqa: E402
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -26,6 +27,7 @@ if config.config_file_name is not None:
 settings = get_settings()
 config.set_main_option("sqlalchemy.url", str(settings.database_url))
 
+load_model_modules()
 target_metadata = Base.metadata
 
 
@@ -48,7 +50,7 @@ def run_migrations_online() -> None:
         async with connectable.connect() as connection:
             await connection.run_sync(do_run_migrations)
 
-    async def do_run_migrations(connection: Connection) -> None:
+    def do_run_migrations(connection: Connection) -> None:
         context.configure(connection=connection, target_metadata=target_metadata)
 
         with context.begin_transaction():

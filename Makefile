@@ -3,7 +3,7 @@ DEV_COMPOSE := infra/docker-compose.dev.yml
 TEST_COMPOSE := infra/docker-compose.test.yml
 CI_COMPOSE := infra/docker-compose.ci.yml
 
-.PHONY: help up down logs restart ps shell test lint typecheck format migrate
+.PHONY: help up down logs restart ps shell test lint typecheck format migrate makemigration
 
 help:
 	@echo "Available targets:"
@@ -15,6 +15,7 @@ help:
 	@echo "  make typecheck # Run mypy"
 	@echo "  make format    # Auto-format via ruff"
 	@echo "  make migrate   # Run Alembic migrations"
+	@echo "  make makemigration name=msg # Autogenerate Alembic revision"
 
 up:
 	$(COMPOSE) -f $(DEV_COMPOSE) up --build -d
@@ -46,4 +47,8 @@ format:
 	$(COMPOSE) -f $(TEST_COMPOSE) run --rm backend-tests ruff format src
 
 migrate:
-	$(COMPOSE) -f $(DEV_COMPOSE) run --rm migrations alembic upgrade head
+	$(COMPOSE) -f $(DEV_COMPOSE) run --build --rm migrations alembic upgrade head
+
+makemigration:
+	@if [ -z "$(name)" ]; then echo "Usage: make makemigration name=short_description"; exit 1; fi
+	$(COMPOSE) -f $(DEV_COMPOSE) run --build --rm migrations alembic revision --autogenerate -m "$(name)"

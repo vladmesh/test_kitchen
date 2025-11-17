@@ -50,6 +50,8 @@ services:
     env_file:
       - ../services/backend/.env.example
     command: alembic upgrade head
+    volumes:
+      - ../services/backend:/app
     depends_on:
       db:
         condition: service_healthy
