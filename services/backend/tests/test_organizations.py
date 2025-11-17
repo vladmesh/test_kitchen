@@ -105,7 +105,7 @@ async def test_get_request_context_success(
     user, organization = await seed_user_and_org(db_session)
     await seed_organization_member(db_session, user.id, organization.id, UserRole.OWNER)
 
-    response = await api_client.get("/api/context", headers=HEADERS)
+    response = await api_client.get("/api/v1/system/context", headers=HEADERS)
     assert response.status_code == 200
     data = response.json()
     assert data["user_id"] == user.id
@@ -133,7 +133,7 @@ async def test_get_request_context_forbidden_wrong_organization(
     await seed_organization_member(db_session, user.id, org1.id, UserRole.OWNER)
 
     wrong_headers = {"Authorization": "Bearer test", "X-Organization-Id": "2"}
-    response = await api_client.get("/api/context", headers=wrong_headers)
+    response = await api_client.get("/api/v1/system/context", headers=wrong_headers)
     assert response.status_code == 403
     assert "not a member of this organization" in response.json()["detail"]
 
@@ -145,7 +145,7 @@ async def test_get_request_context_uses_real_role(
     user, organization = await seed_user_and_org(db_session)
     await seed_organization_member(db_session, user.id, organization.id, UserRole.MANAGER)
 
-    response = await api_client.get("/api/context", headers=HEADERS)
+    response = await api_client.get("/api/v1/system/context", headers=HEADERS)
     assert response.status_code == 200
     data = response.json()
     assert data["role"] == UserRole.MANAGER.value
