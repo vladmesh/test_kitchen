@@ -35,8 +35,8 @@ make up
 # Stop everything
 make down
 
-# Run tests / lint / mypy inside the lint-test image
-make test
+# Run tests / lint / mypy inside Docker
+make tests   # docker compose test stack
 make lint
 make typecheck
 ```

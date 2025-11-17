@@ -20,23 +20,15 @@ services/backend
 └── tests/
 ```
 
-## Run locally
+## Workflow (Docker-only)
 
-```bash
-# install poetry deps locally (optional, docker compose handles this too)
-poetry install
-poetry run uvicorn mini_crm.app.main:app --reload
-```
+- `make up` / `make down` – поднять/остановить dev-стек (backend + postgres + redis).
+- `make shell` – внутри контейнера backend.
+- `make tests` – тестовый стек через `infra/docker-compose.test.yml`.
+- `make lint`, `make typecheck`, `make format` – линтеры/типизация/формат в `infra/Dockerfile.tools`.
+- `make migrate`, `make makemigration name=msg` – работа с Alembic.
 
-Environment variables are configured through `.env.example`. Copy it to `.env` (or inject variables via docker-compose) before running.
-
-## Developer commands
-
-Most workflows are available via the repo-level `Makefile`:
-
-- `make up` / `make down` – run the dockerized dev stack (backend + postgres + redis).
-- `make test` – run pytest, ruff, mypy inside the lint-test stage.
-- `make migrate` – execute Alembic migrations in the migrations container.
+Все команды запускаются внутри контейнеров; локальные `poetry install`, `pytest`, `ruff` и т.п. не используются.
 
 ## Next steps
 
