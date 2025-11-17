@@ -14,7 +14,9 @@ async def ping() -> dict[str, str]:
 
 
 @router.get("/context")
-async def get_context(context: RequestContext = Depends(get_request_context)) -> dict[str, int | str]:
+async def get_context(
+    context: RequestContext = Depends(get_request_context),
+) -> dict[str, int | str]:
     return {
         "user_id": context.user.id,
         "role": context.organization.role.value,

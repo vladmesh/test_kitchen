@@ -18,10 +18,14 @@ def get_auth_service() -> AuthService:
 
 
 @router.post("/register", response_model=TokenPair)
-async def register(payload: RegisterRequest, service: AuthService = Depends(get_auth_service)) -> TokenPair:
+async def register(
+    payload: RegisterRequest, service: AuthService = Depends(get_auth_service)
+) -> TokenPair:
     return await service.register(payload)
 
 
 @router.post("/login", response_model=TokenPair)
-async def login(payload: LoginRequest, service: AuthService = Depends(get_auth_service)) -> TokenPair:
+async def login(
+    payload: LoginRequest, service: AuthService = Depends(get_auth_service)
+) -> TokenPair:
     return await service.login(payload)

@@ -8,11 +8,15 @@ from mini_crm.shared.enums import DealStage, DealStatus
 
 class AbstractDealRepository(ABC):
     @abstractmethod
-    async def list(self, organization_id: int, *, page: int, page_size: int) -> tuple[list[DealResponse], int]:
+    async def list(
+        self, organization_id: int, *, page: int, page_size: int
+    ) -> tuple[list[DealResponse], int]:
         raise NotImplementedError
 
     @abstractmethod
-    async def create(self, organization_id: int, owner_id: int, payload: DealCreate) -> DealResponse:
+    async def create(
+        self, organization_id: int, owner_id: int, payload: DealCreate
+    ) -> DealResponse:
         raise NotImplementedError
 
     @abstractmethod
@@ -25,11 +29,15 @@ class InMemoryDealRepository(AbstractDealRepository):
         self._items: dict[int, DealResponse] = {}
         self._counter = 0
 
-    async def list(self, organization_id: int, *, page: int, page_size: int) -> tuple[list[DealResponse], int]:  # noqa: ARG002
+    async def list(
+        self, organization_id: int, *, page: int, page_size: int
+    ) -> tuple[list[DealResponse], int]:  # noqa: ARG002
         values = list(self._items.values())
         return (values, len(values))
 
-    async def create(self, organization_id: int, owner_id: int, payload: DealCreate) -> DealResponse:  # noqa: ARG002
+    async def create(
+        self, organization_id: int, owner_id: int, payload: DealCreate
+    ) -> DealResponse:  # noqa: ARG002
         self._counter += 1
         deal = DealResponse(
             id=self._counter,

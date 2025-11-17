@@ -13,7 +13,9 @@ class AuthUser:
 
 class AbstractAuthRepository(ABC):
     @abstractmethod
-    async def create_user_with_organization(self, email: str, password_hash: str, name: str, organization_name: str) -> AuthUser:  # noqa: D401
+    async def create_user_with_organization(
+        self, email: str, password_hash: str, name: str, organization_name: str
+    ) -> AuthUser:  # noqa: D401
         raise NotImplementedError
 
     @abstractmethod
@@ -26,7 +28,9 @@ class InMemoryAuthRepository(AbstractAuthRepository):
         self._users: dict[str, AuthUser] = {}
         self._counter = 0
 
-    async def create_user_with_organization(self, email: str, password_hash: str, name: str, organization_name: str) -> AuthUser:  # noqa: ARG002
+    async def create_user_with_organization(
+        self, email: str, password_hash: str, name: str, organization_name: str
+    ) -> AuthUser:  # noqa: ARG002
         self._counter += 1
         user = AuthUser(id=self._counter, email=email, hashed_password=password_hash)
         self._users[email] = user

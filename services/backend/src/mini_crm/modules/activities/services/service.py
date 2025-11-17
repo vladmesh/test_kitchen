@@ -15,10 +15,17 @@ class ActivityService:
     def __init__(self, repository: AbstractActivityRepository | None = None) -> None:
         self.repository = repository or InMemoryActivityRepository()
 
-    async def list_activities(self, context: RequestContext, deal_id: int) -> list[ActivityResponse]:
+    async def list_activities(
+        self, context: RequestContext, deal_id: int
+    ) -> list[ActivityResponse]:
         return await self.repository.list(context.organization.organization_id, deal_id)
 
-    async def create_activity(self, context: RequestContext, deal_id: int, payload: ActivityCreate) -> ActivityResponse:
+    async def create_activity(
+        self, context: RequestContext, deal_id: int, payload: ActivityCreate
+    ) -> ActivityResponse:
         if payload.type != ActivityType.COMMENT and payload.payload is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="payload required for this activity type")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="payload required for this activity type",
+            )
         return await self.repository.create(context.organization.organization_id, deal_id, payload)

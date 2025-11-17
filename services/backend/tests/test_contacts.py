@@ -2,7 +2,6 @@ from fastapi.testclient import TestClient
 
 from mini_crm.app.main import app
 
-
 HEADERS = {"Authorization": "Bearer test", "X-Organization-Id": "1"}
 
 

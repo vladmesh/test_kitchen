@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from jose import jwt
@@ -20,7 +20,7 @@ def get_password_hash(password: str) -> str:
 
 
 def _create_token(subject: str | Any, expires_minutes: int, secret: str, algorithm: str) -> str:
-    expire = datetime.now(tz=timezone.utc) + timedelta(minutes=expires_minutes)
+    expire = datetime.now(tz=UTC) + timedelta(minutes=expires_minutes)
     payload = {"sub": str(subject), "exp": expire}
     return jwt.encode(payload, secret, algorithm=algorithm)
 

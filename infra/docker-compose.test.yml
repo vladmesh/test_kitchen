@@ -34,4 +34,4 @@ services:
       redis:
         condition: service_started
     working_dir: /app
-    command: bash -lc "pytest && ruff check src && mypy"
+    command: bash -lc "pytest"

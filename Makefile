@@ -38,13 +38,16 @@ test:
 	$(COMPOSE) -f $(TEST_COMPOSE) run --rm backend-tests
 
 lint:
-	$(COMPOSE) -f $(TEST_COMPOSE) run --rm backend-tests ruff check src
+	docker build -f infra/Dockerfile.tools -t test-kitchen-tools infra
+	docker run --rm -v $(PWD):/workspace test-kitchen-tools ruff check services
 
 typecheck:
-	$(COMPOSE) -f $(TEST_COMPOSE) run --rm backend-tests mypy src
+	docker build -f infra/Dockerfile.tools -t test-kitchen-tools infra
+	docker run --rm -v $(PWD):/workspace test-kitchen-tools mypy services/backend/src
 
 format:
-	$(COMPOSE) -f $(TEST_COMPOSE) run --rm backend-tests ruff format src
+	docker build -f infra/Dockerfile.tools -t test-kitchen-tools infra
+	docker run --rm -v $(PWD):/workspace test-kitchen-tools sh -c "ruff format services && ruff check --fix services"
 
 migrate:
 	$(COMPOSE) -f $(DEV_COMPOSE) run --build --rm migrations alembic upgrade head

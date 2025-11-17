@@ -15,5 +15,9 @@ class Organization(Base):
     name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default="now()")
 
-    members: Mapped[list["OrganizationMember"]] = relationship("OrganizationMember", back_populates="organization")
-    tags: Mapped[list["Tag"]] = relationship("Tag", back_populates="organization", cascade="all,delete-orphan")
+    members: Mapped[list[OrganizationMember]] = relationship(
+        "OrganizationMember", back_populates="organization"
+    )
+    tags: Mapped[list[Tag]] = relationship(
+        "Tag", back_populates="organization", cascade="all,delete-orphan"
+    )

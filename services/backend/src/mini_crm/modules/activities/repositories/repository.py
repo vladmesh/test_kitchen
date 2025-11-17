@@ -11,7 +11,9 @@ class AbstractActivityRepository(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    async def create(self, organization_id: int, deal_id: int, payload: ActivityCreate) -> ActivityResponse:
+    async def create(
+        self, organization_id: int, deal_id: int, payload: ActivityCreate
+    ) -> ActivityResponse:
         raise NotImplementedError
 
 
@@ -23,7 +25,9 @@ class InMemoryActivityRepository(AbstractActivityRepository):
     async def list(self, organization_id: int, deal_id: int) -> list[ActivityResponse]:  # noqa: ARG002
         return [activity for activity in self._activities if activity.deal_id == deal_id]
 
-    async def create(self, organization_id: int, deal_id: int, payload: ActivityCreate) -> ActivityResponse:  # noqa: ARG002
+    async def create(
+        self, organization_id: int, deal_id: int, payload: ActivityCreate
+    ) -> ActivityResponse:  # noqa: ARG002
         self._counter += 1
         activity = ActivityResponse(id=self._counter, deal_id=deal_id, **payload.model_dump())
         self._activities.append(activity)

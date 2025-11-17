@@ -6,7 +6,10 @@ from fastapi import HTTPException, status
 
 from mini_crm.modules.common.context import RequestContext
 from mini_crm.modules.tasks.dto.schemas import TaskCreate, TaskResponse
-from mini_crm.modules.tasks.repositories.repository import AbstractTaskRepository, InMemoryTaskRepository
+from mini_crm.modules.tasks.repositories.repository import (
+    AbstractTaskRepository,
+    InMemoryTaskRepository,
+)
 
 
 class TaskService:
@@ -18,5 +21,7 @@ class TaskService:
 
     async def create_task(self, context: RequestContext, payload: TaskCreate) -> TaskResponse:
         if payload.due_date and payload.due_date < datetime.utcnow():
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="due_date cannot be in the past")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="due_date cannot be in the past"
+            )
         return await self.repository.create(context.organization.organization_id, payload)

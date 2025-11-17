@@ -34,4 +34,4 @@ EXPOSE 8000
 CMD ["uvicorn", "mini_crm.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
 
 FROM builder AS lint-test
-CMD ["bash", "-lc", "pytest && ruff check . && mypy"]
+CMD ["bash", "-lc", "pytest"]

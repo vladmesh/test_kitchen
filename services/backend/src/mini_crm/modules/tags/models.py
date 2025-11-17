@@ -12,7 +12,9 @@ class Tag(TimestampMixin, Base):
     __table_args__ = (UniqueConstraint("organization_id", "name", name="uq_tags_org_name"),)
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), index=True)
+    organization_id: Mapped[int] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
     name: Mapped[str] = mapped_column(String(64), nullable=False)
     color: Mapped[str] = mapped_column(String(7), nullable=False, server_default="#000000")
 

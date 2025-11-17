@@ -14,7 +14,7 @@ services:
     depends_on:
       db:
         condition: service_started
-    command: bash -lc "pytest && ruff check src && mypy"
+    command: bash -lc "pytest"
 
   db:
     image: postgres:15-alpine

@@ -22,7 +22,9 @@ class User(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default="now()")
 
-    memberships: Mapped[list["OrganizationMember"]] = relationship(back_populates="user", cascade="all,delete-orphan")
+    memberships: Mapped[list[OrganizationMember]] = relationship(
+        back_populates="user", cascade="all,delete-orphan"
+    )
 
 
 class OrganizationMember(Base):
@@ -30,9 +32,11 @@ class OrganizationMember(Base):
     __table_args__ = (UniqueConstraint("organization_id", "user_id", name="uq_member_org_user"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id", ondelete="CASCADE"), index=True)
+    organization_id: Mapped[int] = mapped_column(
+        ForeignKey("organizations.id", ondelete="CASCADE"), index=True
+    )
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     role: Mapped[UserRole] = mapped_column(String(20), default=UserRole.MEMBER)
 
-    organization: Mapped["Organization"] = relationship(back_populates="members")
+    organization: Mapped[Organization] = relationship(back_populates="members")
     user: Mapped[User] = relationship(back_populates="memberships")
