@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from pydantic import field_serializer
+
 from mini_crm.shared.dto.base import DTO
 
 
@@ -25,6 +27,12 @@ class DealsSummary(DTO):
     amounts_by_status: StatusAmount
     avg_won_amount: Decimal | None = None
     new_deals_last_30_days: int = 0
+
+    @field_serializer("avg_won_amount")
+    def serialize_avg_won_amount(self, value: Decimal | None) -> str | None:
+        if value is None:
+            return None
+        return f"{value:.2f}"
 
 
 class StageStats(DTO):

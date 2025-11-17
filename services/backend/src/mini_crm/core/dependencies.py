@@ -56,5 +56,6 @@ async def get_request_context(
             detail="User is not a member of this organization",
         )
 
-    org_context = OrganizationContext(organization_id=organization_id, role=membership.role)
+    role = membership.role if isinstance(membership.role, UserRole) else UserRole(membership.role)
+    org_context = OrganizationContext(organization_id=organization_id, role=role)
     return RequestContext(user=user, organization=org_context)

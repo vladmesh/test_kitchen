@@ -37,6 +37,7 @@ test:
 	@echo "Use 'make tests' to run the suite inside Docker." && exit 1
 
 tests:
+	$(COMPOSE) -f $(TEST_COMPOSE) build --no-cache
 	$(COMPOSE) -f $(TEST_COMPOSE) run --rm backend-tests
 
 lint:
