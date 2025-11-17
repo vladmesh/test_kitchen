@@ -1,22 +1,28 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from mini_crm.core.dependencies import get_request_context
+from mini_crm.core.dependencies import get_db_session, get_request_context
 from mini_crm.modules.activities.dto.schemas import ActivityCreate, ActivityResponse
-from mini_crm.modules.activities.repositories.repository import InMemoryActivityRepository
+from mini_crm.modules.activities.repositories.repository import AbstractActivityRepository
+from mini_crm.modules.activities.repositories.sqlalchemy import SQLAlchemyActivityRepository
 from mini_crm.modules.activities.services.service import ActivityService
 from mini_crm.modules.common.context import RequestContext
 
 router = APIRouter(prefix="/deals/{deal_id}/activities", tags=["activities"])
 
 
-_activity_repository = InMemoryActivityRepository()
-_activity_service = ActivityService(repository=_activity_repository)
+def get_activity_repository(
+    session: AsyncSession = Depends(get_db_session),
+) -> AbstractActivityRepository:
+    return SQLAlchemyActivityRepository(session=session)
 
 
-def get_activity_service() -> ActivityService:
-    return _activity_service
+def get_activity_service(
+    repository: AbstractActivityRepository = Depends(get_activity_repository),
+) -> ActivityService:
+    return ActivityService(repository=repository)
 
 
 @router.get("", response_model=list[ActivityResponse])

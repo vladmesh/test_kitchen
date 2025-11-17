@@ -28,4 +28,8 @@ class ActivityService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="payload required for this activity type",
             )
-        return await self.repository.create(context.organization.organization_id, deal_id, payload)
+        # For comments, use user id as author; for system events, author_id is None
+        author_id = context.user.id if payload.type == ActivityType.COMMENT else None
+        return await self.repository.create(
+            context.organization.organization_id, deal_id, payload, author_id=author_id
+        )

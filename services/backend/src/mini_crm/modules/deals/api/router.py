@@ -4,10 +4,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mini_crm.core.dependencies import get_db_session, get_request_context
-from mini_crm.modules.activities.repositories.repository import (
-    AbstractActivityRepository,
-    InMemoryActivityRepository,
-)
+from mini_crm.modules.activities.repositories.repository import AbstractActivityRepository
+from mini_crm.modules.activities.repositories.sqlalchemy import SQLAlchemyActivityRepository
 from mini_crm.modules.common.context import RequestContext
 from mini_crm.modules.deals.dto.schemas import DealCreate, DealResponse, DealUpdate, PaginatedDeals
 from mini_crm.modules.deals.repositories.repository import AbstractDealRepository
@@ -23,9 +21,10 @@ def get_deal_repository(
     return SQLAlchemyDealRepository(session=session)
 
 
-def get_activity_repository() -> AbstractActivityRepository:
-    # Temporary: use InMemory until activities module is migrated to PostgreSQL
-    return InMemoryActivityRepository()
+def get_activity_repository(
+    session: AsyncSession = Depends(get_db_session),
+) -> AbstractActivityRepository:
+    return SQLAlchemyActivityRepository(session=session)
 
 
 def get_deal_service(

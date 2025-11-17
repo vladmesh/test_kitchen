@@ -12,7 +12,11 @@ class AbstractActivityRepository(ABC):
 
     @abstractmethod
     async def create(
-        self, organization_id: int, deal_id: int, payload: ActivityCreate
+        self,
+        organization_id: int,
+        deal_id: int,
+        payload: ActivityCreate,
+        author_id: int | None = None,
     ) -> ActivityResponse:
         raise NotImplementedError
 
@@ -26,7 +30,11 @@ class InMemoryActivityRepository(AbstractActivityRepository):
         return [activity for activity in self._activities if activity.deal_id == deal_id]
 
     async def create(
-        self, organization_id: int, deal_id: int, payload: ActivityCreate
+        self,
+        organization_id: int,
+        deal_id: int,
+        payload: ActivityCreate,
+        author_id: int | None = None,
     ) -> ActivityResponse:  # noqa: ARG002
         self._counter += 1
         activity = ActivityResponse(id=self._counter, deal_id=deal_id, **payload.model_dump())
