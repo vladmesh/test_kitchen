@@ -7,6 +7,8 @@ from mini_crm.core.dependencies import get_db_session, get_request_context
 from mini_crm.modules.activities.repositories.repository import AbstractActivityRepository
 from mini_crm.modules.activities.repositories.sqlalchemy import SQLAlchemyActivityRepository
 from mini_crm.modules.common.context import RequestContext
+from mini_crm.modules.deals.repositories.repository import AbstractDealRepository
+from mini_crm.modules.deals.repositories.sqlalchemy import SQLAlchemyDealRepository
 from mini_crm.modules.tasks.dto.schemas import TaskCreate, TaskResponse
 from mini_crm.modules.tasks.repositories.repository import AbstractTaskRepository
 from mini_crm.modules.tasks.repositories.sqlalchemy import SQLAlchemyTaskRepository
@@ -27,11 +29,22 @@ def get_activity_repository(
     return SQLAlchemyActivityRepository(session=session)
 
 
+def get_deal_repository(
+    session: AsyncSession = Depends(get_db_session),
+) -> AbstractDealRepository:
+    return SQLAlchemyDealRepository(session=session)
+
+
 def get_task_service(
     repository: AbstractTaskRepository = Depends(get_task_repository),
     activity_repository: AbstractActivityRepository = Depends(get_activity_repository),
+    deal_repository: AbstractDealRepository = Depends(get_deal_repository),
 ) -> TaskService:
-    return TaskService(repository=repository, activity_repository=activity_repository)
+    return TaskService(
+        repository=repository,
+        activity_repository=activity_repository,
+        deal_repository=deal_repository,
+    )
 
 
 @router.get("", response_model=list[TaskResponse])

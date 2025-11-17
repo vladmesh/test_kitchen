@@ -22,6 +22,7 @@ class DealUpdate(DTO):
 
 class DealResponse(DTO):
     id: int
+    organization_id: int
     contact_id: int
     owner_id: int | None
     title: str

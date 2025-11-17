@@ -35,11 +35,16 @@ class AbstractDealRepository(ABC):
     async def update(self, organization_id: int, deal_id: int, payload: DealUpdate) -> DealResponse:
         raise NotImplementedError
 
+    @abstractmethod
+    async def get_by_id(self, organization_id: int, deal_id: int) -> DealResponse | None:
+        raise NotImplementedError
+
 
 class InMemoryDealRepository(AbstractDealRepository):
     def __init__(self) -> None:
         self._items: dict[int, DealResponse] = {}
         self._counter = 0
+        self._organization_ids: dict[int, int] = {}
 
     async def list(
         self,
@@ -89,6 +94,7 @@ class InMemoryDealRepository(AbstractDealRepository):
         self._counter += 1
         deal = DealResponse(
             id=self._counter,
+            organization_id=organization_id,
             contact_id=payload.contact_id,
             owner_id=owner_id,
             title=payload.title,
@@ -98,6 +104,7 @@ class InMemoryDealRepository(AbstractDealRepository):
             stage=DealStage.QUALIFICATION,
         )
         self._items[self._counter] = deal
+        self._organization_ids[self._counter] = organization_id
         return deal
 
     async def update(self, organization_id: int, deal_id: int, payload: DealUpdate) -> DealResponse:  # noqa: ARG002
@@ -105,3 +112,11 @@ class InMemoryDealRepository(AbstractDealRepository):
         updated = deal.model_copy(update=payload.model_dump(exclude_none=True))
         self._items[deal_id] = updated
         return updated
+
+    async def get_by_id(self, organization_id: int, deal_id: int) -> DealResponse | None:
+        deal = self._items.get(deal_id)
+        if deal is None:
+            return None
+        if self._organization_ids.get(deal_id) != organization_id:
+            return None
+        return deal

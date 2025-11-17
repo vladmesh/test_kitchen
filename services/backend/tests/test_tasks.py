@@ -124,3 +124,125 @@ async def test_create_task_creates_activity(
         assert activities[0].payload["task_title"] == "Call client"
     finally:
         app.dependency_overrides.pop(get_activity_repository, None)
+
+
+@pytest.mark.asyncio
+async def test_member_cannot_create_task_for_foreign_deal(
+    api_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    from fastapi import Depends, Header
+
+    from mini_crm.app.main import app
+    from mini_crm.core.dependencies import get_db_session, get_request_context, get_request_user
+    from mini_crm.modules.common.context import OrganizationContext, RequestContext, RequestUser
+    from mini_crm.modules.organizations.repositories.sqlalchemy import (
+        SQLAlchemyOrganizationRepository,
+    )
+
+    await seed_user_and_org(db_session)
+    await seed_organization_member(db_session, user_id=1, organization_id=1, role=UserRole.OWNER)
+
+    # Create second user with MEMBER role
+    member_user = User(
+        id=2,
+        email="member@example.com",
+        hashed_password="hashed",
+        name="Member",
+        created_at=datetime.now(tz=UTC),
+    )
+    db_session.add(member_user)
+    await db_session.commit()
+    await seed_organization_member(db_session, user_id=2, organization_id=1, role=UserRole.MEMBER)
+
+    # Create contact and deal owned by user 1
+    await seed_contact(db_session, organization_id=1, owner_id=1)
+    deal = await seed_deal(db_session, organization_id=1, contact_id=1, owner_id=1)
+
+    async def override_get_request_user() -> RequestUser:
+        return RequestUser(id=2, email="member@example.com", role=UserRole.MEMBER)
+
+    async def override_get_request_context(
+        user: RequestUser = Depends(override_get_request_user),
+        organization_id: int | None = Header(default=None, alias="X-Organization-Id"),
+        session: AsyncSession = Depends(get_db_session),
+    ) -> RequestContext:
+        if organization_id is None:
+            organization_id = 1
+        repository = SQLAlchemyOrganizationRepository(session)
+        membership = await repository.get_membership(user.id, organization_id)
+        role = (
+            membership.role if isinstance(membership.role, UserRole) else UserRole(membership.role)
+        )
+        org_context = OrganizationContext(organization_id=organization_id, role=role)
+        return RequestContext(user=user, organization=org_context)
+
+    app.dependency_overrides[get_request_user] = override_get_request_user
+    app.dependency_overrides[get_request_context] = override_get_request_context
+
+    try:
+        payload = {
+            "deal_id": deal.id,
+            "title": "Member tries foreign deal",
+            "description": "Should be forbidden",
+            "due_date": "2025-12-31T00:00:00Z",
+        }
+        member_headers = {"Authorization": "Bearer test", "X-Organization-Id": "1"}
+        response = await api_client.post("/api/v1/tasks", json=payload, headers=member_headers)
+        assert response.status_code == 403
+        assert response.json()["detail"] == "You can only create tasks for your own deals"
+    finally:
+        app.dependency_overrides.pop(get_request_user, None)
+        app.dependency_overrides.pop(get_request_context, None)
+
+
+@pytest.mark.asyncio
+async def test_create_task_for_deal_in_another_organization_forbidden(
+    api_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await seed_user_and_org(db_session)
+    await seed_organization_member(db_session, user_id=1, organization_id=1, role=UserRole.OWNER)
+
+    # Create second organization and related contact/deal
+    org2 = Organization(id=2, name="Beta Inc", created_at=datetime.now(tz=UTC))
+    db_session.add(org2)
+    await db_session.commit()
+
+    contact_org2 = Contact(
+        id=2,
+        organization_id=2,
+        owner_id=1,
+        name="Org2 Contact",
+        email="org2@example.com",
+        phone="+222222",
+        created_at=datetime.now(tz=UTC),
+    )
+    db_session.add(contact_org2)
+    await db_session.commit()
+    await db_session.refresh(contact_org2)
+
+    deal_org2 = Deal(
+        id=2,
+        organization_id=2,
+        contact_id=contact_org2.id,
+        owner_id=1,
+        title="Org2 Deal",
+        amount=5000.00,
+        currency="USD",
+        status=DealStatus.NEW,
+        stage=DealStage.QUALIFICATION,
+        created_at=datetime.now(tz=UTC),
+        updated_at=datetime.now(tz=UTC),
+    )
+    db_session.add(deal_org2)
+    await db_session.commit()
+    await db_session.refresh(deal_org2)
+
+    payload = {
+        "deal_id": deal_org2.id,
+        "title": "Cross org task",
+        "description": "Should fail",
+        "due_date": "2025-12-31T00:00:00Z",
+    }
+    response = await api_client.post("/api/v1/tasks", json=payload, headers=HEADERS)
+    assert response.status_code == 404
+    assert "Deal not found" in response.json()["detail"]

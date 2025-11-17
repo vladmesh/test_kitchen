@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from decimal import Decimal
-from typing import cast
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
@@ -147,10 +146,12 @@ class SQLAlchemyDealRepository(AbstractDealRepository):
         await self.session.refresh(deal)
         return DealResponse.model_validate(deal)
 
-    async def get_by_id(self, organization_id: int, deal_id: int) -> Deal | None:
+    async def get_by_id(self, organization_id: int, deal_id: int) -> DealResponse | None:
         stmt = select(Deal).where(
             Deal.id == deal_id,
             Deal.organization_id == organization_id,
         )
         result = await self.session.scalar(stmt)
-        return cast(Deal | None, result)
+        if result is None:
+            return None
+        return DealResponse.model_validate(result)
