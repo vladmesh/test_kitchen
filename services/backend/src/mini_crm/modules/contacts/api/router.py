@@ -29,10 +29,18 @@ def get_contact_service(
 async def list_contacts(
     page: int = 1,
     page_size: int = 50,
+    search: str | None = None,
+    owner_id: int | None = None,
     context: RequestContext = Depends(get_request_context),
     service: ContactService = Depends(get_contact_service),
 ) -> PaginatedContacts:
-    return await service.list_contacts(context, page=page, page_size=page_size)
+    return await service.list_contacts(
+        context,
+        page=page,
+        page_size=page_size,
+        search=search,
+        owner_id=owner_id,
+    )
 
 
 @router.post("", response_model=ContactResponse, status_code=201)

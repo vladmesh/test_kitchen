@@ -17,10 +17,24 @@ class ContactService:
         self.repository = repository or InMemoryContactRepository()
 
     async def list_contacts(
-        self, context: RequestContext, page: int = 1, page_size: int = 50
+        self,
+        context: RequestContext,
+        page: int = 1,
+        page_size: int = 50,
+        search: str | None = None,
+        owner_id: int | None = None,
     ) -> PaginatedContacts:
+        if owner_id is not None and context.organization.role == UserRole.MEMBER:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Filtering by owner_id is not allowed for member role",
+            )
         items, total = await self.repository.list(
-            context.organization.organization_id, page=page, page_size=page_size
+            context.organization.organization_id,
+            page=page,
+            page_size=page_size,
+            search=search,
+            owner_id=owner_id,
         )
         meta = PaginationMeta(page=page, page_size=page_size, total=total)
         return PaginatedContacts(items=items, meta=meta)

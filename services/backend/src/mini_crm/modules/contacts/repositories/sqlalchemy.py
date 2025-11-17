@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mini_crm.modules.contacts.dto.schemas import ContactCreate, ContactResponse
@@ -17,16 +17,25 @@ class SQLAlchemyContactRepository(AbstractContactRepository):
         self.session = session
 
     async def list(
-        self, organization_id: int, *, page: int, page_size: int
+        self,
+        organization_id: int,
+        *,
+        page: int,
+        page_size: int,
+        search: str | None = None,
+        owner_id: int | None = None,
     ) -> tuple[list[ContactResponse], int]:
         offset = max(page - 1, 0) * page_size
-        stmt = (
-            select(Contact)
-            .where(Contact.organization_id == organization_id)
-            .order_by(Contact.id)
-            .offset(offset)
-            .limit(page_size)
-        )
+        stmt = select(Contact).where(Contact.organization_id == organization_id)
+
+        if owner_id is not None:
+            stmt = stmt.where(Contact.owner_id == owner_id)
+
+        if search:
+            pattern = f"%{search}%"
+            stmt = stmt.where(or_(Contact.name.ilike(pattern), Contact.email.ilike(pattern)))
+
+        stmt = stmt.order_by(Contact.id).offset(offset).limit(page_size)
         result = await self.session.scalars(stmt)
         contacts = result.all()
 
@@ -35,6 +44,13 @@ class SQLAlchemyContactRepository(AbstractContactRepository):
             .select_from(Contact)
             .where(Contact.organization_id == organization_id)
         )
+        if owner_id is not None:
+            count_stmt = count_stmt.where(Contact.owner_id == owner_id)
+        if search:
+            pattern = f"%{search}%"
+            count_stmt = count_stmt.where(
+                or_(Contact.name.ilike(pattern), Contact.email.ilike(pattern))
+            )
         total = await self.session.scalar(count_stmt)
 
         items = [ContactResponse.model_validate(contact) for contact in contacts]

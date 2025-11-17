@@ -8,7 +8,13 @@ from mini_crm.modules.contacts.dto.schemas import ContactCreate, ContactResponse
 class AbstractContactRepository(ABC):
     @abstractmethod
     async def list(
-        self, organization_id: int, *, page: int, page_size: int
+        self,
+        organization_id: int,
+        *,
+        page: int,
+        page_size: int,
+        search: str | None = None,
+        owner_id: int | None = None,
     ) -> tuple[list[ContactResponse], int]:
         raise NotImplementedError
 
@@ -33,9 +39,29 @@ class InMemoryContactRepository(AbstractContactRepository):
         self._counter = 0
 
     async def list(
-        self, organization_id: int, *, page: int, page_size: int
+        self,
+        organization_id: int,
+        *,
+        page: int,
+        page_size: int,
+        search: str | None = None,
+        owner_id: int | None = None,
     ) -> tuple[list[ContactResponse], int]:  # noqa: ARG002
-        return (self._contacts, len(self._contacts))
+        filtered = self._contacts
+        if owner_id is not None:
+            filtered = [c for c in filtered if c.owner_id == owner_id]
+        if search:
+            needle = search.lower()
+            filtered = [
+                c
+                for c in filtered
+                if (c.name and needle in c.name.lower()) or (c.email and needle in c.email.lower())
+            ]
+
+        total = len(filtered)
+        offset = max(page - 1, 0) * page_size
+        items = filtered[offset : offset + page_size]
+        return (items, total)
 
     async def create(
         self, organization_id: int, owner_id: int, payload: ContactCreate

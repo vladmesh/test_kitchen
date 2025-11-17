@@ -116,6 +116,35 @@ async def test_delete_contact_success(api_client: AsyncClient, db_session: Async
 
 
 @pytest.mark.asyncio
+async def test_list_contacts_search_filter(
+    api_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await seed_user_and_org(db_session)
+    await seed_organization_member(db_session, user_id=1, organization_id=1)
+
+    await api_client.post(
+        "/api/v1/contacts",
+        json={"name": "Alice Smith", "email": "alice@example.com", "phone": "+111111"},
+        headers=HEADERS,
+    )
+    await api_client.post(
+        "/api/v1/contacts",
+        json={"name": "Bob Johnson", "email": "bob@example.com", "phone": "+222222"},
+        headers=HEADERS,
+    )
+
+    list_response = await api_client.get(
+        "/api/v1/contacts",
+        params={"search": "alice"},
+        headers=HEADERS,
+    )
+    assert list_response.status_code == 200
+    data = list_response.json()
+    assert data["meta"]["total"] == 1
+    assert data["items"][0]["name"] == "Alice Smith"
+
+
+@pytest.mark.asyncio
 async def test_delete_contact_with_deals_fails(
     api_client: AsyncClient, db_session: AsyncSession
 ) -> None:
@@ -288,3 +317,68 @@ async def test_delete_contact_member_can_delete_own(
     finally:
         app.dependency_overrides.pop(get_request_user, None)
         app.dependency_overrides.pop(get_request_context, None)
+
+
+@pytest.mark.asyncio
+async def test_list_contacts_owner_filter_allowed_roles(
+    api_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await seed_user_and_org(db_session)
+    await seed_organization_member(db_session, user_id=1, organization_id=1, role=UserRole.MANAGER)
+
+    # Contact owned by current user (id=1)
+    await api_client.post(
+        "/api/v1/contacts",
+        json={"name": "Owner Contact", "email": "owner@example.com", "phone": "+333333"},
+        headers=HEADERS,
+    )
+
+    # Second user and contact owned by them
+    user2 = User(
+        id=2,
+        email="manager@example.com",
+        hashed_password="hashed",
+        name="Manager",
+        created_at=datetime.now(tz=UTC),
+    )
+    db_session.add(user2)
+    await db_session.commit()
+    await seed_organization_member(db_session, user_id=2, organization_id=1, role=UserRole.MEMBER)
+
+    contact = Contact(
+        id=2,
+        organization_id=1,
+        owner_id=2,
+        name="Manager Contact",
+        email="manager@example.com",
+        phone="+444444",
+        created_at=datetime.now(tz=UTC),
+    )
+    db_session.add(contact)
+    await db_session.commit()
+
+    response = await api_client.get(
+        "/api/v1/contacts",
+        params={"owner_id": 2},
+        headers=HEADERS,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["meta"]["total"] == 1
+    assert all(item["owner_id"] == 2 for item in data["items"])
+
+
+@pytest.mark.asyncio
+async def test_list_contacts_owner_filter_forbidden_for_member(
+    api_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await seed_user_and_org(db_session)
+    await seed_organization_member(db_session, user_id=1, organization_id=1, role=UserRole.MEMBER)
+
+    response = await api_client.get(
+        "/api/v1/contacts",
+        params={"owner_id": 1},
+        headers=HEADERS,
+    )
+    assert response.status_code == 403
+    assert "Filtering by owner_id is not allowed for member role" in response.json()["detail"]
