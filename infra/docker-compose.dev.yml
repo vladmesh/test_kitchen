@@ -1,0 +1,59 @@
+x-backend-build: &backend-build
+  context: ../services/backend
+  dockerfile: Dockerfile
+
+services:
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-mini_crm}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  backend:
+    build:
+      <<: *backend-build
+      target: runtime
+    env_file:
+      - ../services/backend/.env.example
+    command: uvicorn mini_crm.app.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - ../services/backend:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  migrations:
+    build:
+      <<: *backend-build
+      target: runtime
+    env_file:
+      - ../services/backend/.env.example
+    command: alembic upgrade head
+    depends_on:
+      db:
+        condition: service_healthy
+    profiles: ["manual"]
+
+volumes:
+  db-data:

@@ -1,0 +1,9 @@
+target-version = "py311"
+line-length = 100
+src = ["src"]
+exclude = ["migrations"]
+select = ["E", "F", "I", "N", "ASYNC", "B", "UP"]
+ignore = ["E501"]
+
+[lint.isort]
+known-first-party = ["mini_crm"]
