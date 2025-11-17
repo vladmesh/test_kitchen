@@ -1,9 +1,14 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from decimal import Decimal
 
-from mini_crm.modules.analytics.dto.schemas import DealsFunnel, DealsSummary, FunnelPoint
+from mini_crm.modules.analytics.dto.schemas import (
+    DealsFunnel,
+    DealsSummary,
+    StageStats,
+    StatusAmount,
+    StatusCount,
+)
 
 
 class AbstractAnalyticsRepository(ABC):
@@ -18,7 +23,18 @@ class AbstractAnalyticsRepository(ABC):
 
 class InMemoryAnalyticsRepository(AbstractAnalyticsRepository):
     async def deals_summary(self, organization_id: int) -> DealsSummary:  # noqa: ARG002
-        return DealsSummary(total_deals=0, won_deals=0, lost_deals=0, total_amount=Decimal("0"))
+        return DealsSummary(
+            total_deals=0,
+            deals_by_status=StatusCount(),
+            amounts_by_status=StatusAmount(),
+            avg_won_amount=None,
+            new_deals_last_30_days=0,
+        )
 
     async def deals_funnel(self, organization_id: int) -> DealsFunnel:  # noqa: ARG002
-        return DealsFunnel(stages=[FunnelPoint(stage="qualification", value=0)])
+        return DealsFunnel(
+            stages=[
+                StageStats(stage="qualification", total=0, by_status=StatusCount()),
+            ],
+            conversion_rates=[],
+        )
