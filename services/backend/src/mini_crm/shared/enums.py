@@ -27,5 +27,6 @@ class DealStage(str, Enum):
 class ActivityType(str, Enum):
     COMMENT = "comment"
     STATUS_CHANGED = "status_changed"
+    STAGE_CHANGED = "stage_changed"
     TASK_CREATED = "task_created"
     SYSTEM = "system"
