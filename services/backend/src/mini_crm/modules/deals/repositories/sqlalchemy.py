@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from typing import cast
 
 from fastapi import HTTPException, status
 from sqlalchemy import func, select
@@ -108,4 +109,5 @@ class SQLAlchemyDealRepository(AbstractDealRepository):
             Deal.id == deal_id,
             Deal.organization_id == organization_id,
         )
-        return await self.session.scalar(stmt)
+        result = await self.session.scalar(stmt)
+        return cast(Deal | None, result)
