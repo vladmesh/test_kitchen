@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from mini_crm.modules.auth.models import OrganizationMember, User
 from mini_crm.modules.contacts.models import Contact
-from mini_crm.modules.deals.dto.schemas import DealCreate
+from mini_crm.modules.deals.dto.schemas import DealCreate, DealUpdate
 from mini_crm.modules.deals.repositories.sqlalchemy import SQLAlchemyDealRepository
 from mini_crm.modules.organizations.models import Organization
 from mini_crm.shared.enums import DealStage, DealStatus, UserRole
@@ -461,3 +461,305 @@ async def test_deal_update_member_can_update_own_deal(db_session: AsyncSession) 
     update_payload = DealUpdate(status=DealStatus.IN_PROGRESS)
     updated = await service.update_deal(member_context, created.id, update_payload)
     assert updated.status == DealStatus.IN_PROGRESS
+
+
+@pytest.mark.asyncio
+async def test_deals_list_filter_by_status(
+    api_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await seed_user_and_org(db_session)
+    await seed_organization_member(db_session, user_id=1, organization_id=1)
+    await seed_contact(db_session, organization_id=1, owner_id=1)
+
+    # Create deals with different statuses
+    deal_ids = []
+    for status in [DealStatus.NEW, DealStatus.IN_PROGRESS, DealStatus.WON]:
+        create_payload = {
+            "contact_id": 1,
+            "title": f"Deal {status.value}",
+            "amount": "1000.00",
+            "currency": "USD",
+        }
+        response = await api_client.post("/api/v1/deals", json=create_payload, headers=HEADERS)
+        deal_ids.append(response.json()["id"])
+
+    # Update statuses
+    for deal_id, status in zip(
+        deal_ids, [DealStatus.NEW, DealStatus.IN_PROGRESS, DealStatus.WON], strict=True
+    ):
+        update_payload = {"status": status.value}
+        await api_client.patch(f"/api/v1/deals/{deal_id}", json=update_payload, headers=HEADERS)
+
+    # Filter by single status
+    response = await api_client.get("/api/v1/deals?status=new", headers=HEADERS)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["meta"]["total"] == 1
+    assert all(item["status"] == DealStatus.NEW.value for item in data["items"])
+
+    # Filter by multiple statuses
+    response = await api_client.get("/api/v1/deals?status=new&status=in_progress", headers=HEADERS)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["meta"]["total"] == 2
+    assert all(
+        item["status"] in [DealStatus.NEW.value, DealStatus.IN_PROGRESS.value]
+        for item in data["items"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_deals_list_filter_by_amount(
+    api_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await seed_user_and_org(db_session)
+    await seed_organization_member(db_session, user_id=1, organization_id=1)
+    await seed_contact(db_session, organization_id=1, owner_id=1)
+
+    # Create deals with different amounts
+    amounts = ["500.00", "1500.00", "2500.00", "3500.00"]
+    for amount in amounts:
+        create_payload = {
+            "contact_id": 1,
+            "title": f"Deal {amount}",
+            "amount": amount,
+            "currency": "USD",
+        }
+        await api_client.post("/api/v1/deals", json=create_payload, headers=HEADERS)
+
+    # Filter by min_amount
+    response = await api_client.get("/api/v1/deals?min_amount=2000.00", headers=HEADERS)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["meta"]["total"] == 2
+    assert all(Decimal(item["amount"]) >= Decimal("2000.00") for item in data["items"])
+
+    # Filter by max_amount
+    response = await api_client.get("/api/v1/deals?max_amount=2000.00", headers=HEADERS)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["meta"]["total"] == 2
+    assert all(Decimal(item["amount"]) <= Decimal("2000.00") for item in data["items"])
+
+    # Filter by both min_amount and max_amount
+    response = await api_client.get(
+        "/api/v1/deals?min_amount=1000.00&max_amount=3000.00", headers=HEADERS
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["meta"]["total"] == 2
+    assert all(
+        Decimal("1000.00") <= Decimal(item["amount"]) <= Decimal("3000.00")
+        for item in data["items"]
+    )
+
+
+@pytest.mark.asyncio
+async def test_deals_list_filter_by_stage(
+    api_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await seed_user_and_org(db_session)
+    await seed_organization_member(db_session, user_id=1, organization_id=1)
+    await seed_contact(db_session, organization_id=1, owner_id=1)
+
+    repository = SQLAlchemyDealRepository(session=db_session)
+
+    # Create deals with different stages
+    for stage in [DealStage.QUALIFICATION, DealStage.PROPOSAL, DealStage.NEGOTIATION]:
+        payload = DealCreate(
+            contact_id=1,
+            title=f"Deal {stage.value}",
+            amount=Decimal("1000.00"),
+            currency="USD",
+        )
+        created = await repository.create(organization_id=1, owner_id=1, payload=payload)
+        await repository.update(
+            organization_id=1, deal_id=created.id, payload=DealUpdate(stage=stage)
+        )
+        await db_session.commit()
+
+    # Filter by stage
+    response = await api_client.get("/api/v1/deals?stage=qualification", headers=HEADERS)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["meta"]["total"] == 1
+    assert all(item["stage"] == DealStage.QUALIFICATION.value for item in data["items"])
+
+
+@pytest.mark.asyncio
+async def test_deals_list_filter_by_owner_id(
+    api_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await seed_user_and_org(db_session)
+    await seed_organization_member(db_session, user_id=1, organization_id=1)
+    await seed_contact(db_session, organization_id=1, owner_id=1)
+
+    # Create second user
+    from mini_crm.modules.auth.models import User
+
+    user2 = User(
+        id=2,
+        email="user2@example.com",
+        hashed_password="hashed",
+        name="User 2",
+        created_at=datetime.now(tz=UTC),
+    )
+    db_session.add(user2)
+    await db_session.commit()
+    await seed_organization_member(db_session, user_id=2, organization_id=1)
+
+    repository = SQLAlchemyDealRepository(session=db_session)
+
+    # Create deals for different owners
+    payload1 = DealCreate(contact_id=1, title="Deal 1", amount=Decimal("1000.00"), currency="USD")
+    await repository.create(organization_id=1, owner_id=1, payload=payload1)
+    await db_session.commit()
+
+    payload2 = DealCreate(contact_id=1, title="Deal 2", amount=Decimal("2000.00"), currency="USD")
+    await repository.create(organization_id=1, owner_id=2, payload=payload2)
+    await db_session.commit()
+
+    # Filter by owner_id
+    response = await api_client.get("/api/v1/deals?owner_id=1", headers=HEADERS)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["meta"]["total"] == 1
+    assert all(item["owner_id"] == 1 for item in data["items"])
+
+
+@pytest.mark.asyncio
+async def test_deals_list_filter_by_owner_id_member_forbidden(
+    api_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await seed_user_and_org(db_session)
+    await seed_organization_member(db_session, user_id=1, organization_id=1, role=UserRole.MEMBER)
+    await seed_contact(db_session, organization_id=1, owner_id=1)
+
+    # Try to filter by owner_id as member - should fail
+    response = await api_client.get("/api/v1/deals?owner_id=1", headers=HEADERS)
+    assert response.status_code == 403
+    assert "Filtering by owner_id is not allowed for member role" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_deals_list_sort_by_created_at(
+    api_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await seed_user_and_org(db_session)
+    await seed_organization_member(db_session, user_id=1, organization_id=1)
+    await seed_contact(db_session, organization_id=1, owner_id=1)
+
+    repository = SQLAlchemyDealRepository(session=db_session)
+
+    # Create deals with delays to ensure different created_at
+    import asyncio
+
+    for i in range(3):
+        payload = DealCreate(
+            contact_id=1,
+            title=f"Deal {i}",
+            amount=Decimal("1000.00"),
+            currency="USD",
+        )
+        await repository.create(organization_id=1, owner_id=1, payload=payload)
+        await db_session.commit()
+        await asyncio.sleep(0.01)  # Small delay to ensure different timestamps
+
+    # Sort by created_at ascending
+    response = await api_client.get("/api/v1/deals?order_by=created_at&order=asc", headers=HEADERS)
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["items"]) >= 3
+    created_ats = [item.get("created_at") for item in data["items"] if "created_at" in item]
+    if created_ats:
+        assert created_ats == sorted(created_ats)
+
+    # Sort by created_at descending
+    response = await api_client.get("/api/v1/deals?order_by=created_at&order=desc", headers=HEADERS)
+    assert response.status_code == 200
+    data = response.json()
+    created_ats = [item.get("created_at") for item in data["items"] if "created_at" in item]
+    if created_ats:
+        assert created_ats == sorted(created_ats, reverse=True)
+
+
+@pytest.mark.asyncio
+async def test_deals_list_sort_by_amount(api_client: AsyncClient, db_session: AsyncSession) -> None:
+    await seed_user_and_org(db_session)
+    await seed_organization_member(db_session, user_id=1, organization_id=1)
+    await seed_contact(db_session, organization_id=1, owner_id=1)
+
+    # Create deals with different amounts
+    amounts = ["3000.00", "1000.00", "2000.00"]
+    for amount in amounts:
+        create_payload = {
+            "contact_id": 1,
+            "title": f"Deal {amount}",
+            "amount": amount,
+            "currency": "USD",
+        }
+        await api_client.post("/api/v1/deals", json=create_payload, headers=HEADERS)
+
+    # Sort by amount ascending
+    response = await api_client.get("/api/v1/deals?order_by=amount&order=asc", headers=HEADERS)
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["items"]) >= 3
+    amounts_sorted = [Decimal(item["amount"]) for item in data["items"]]
+    assert amounts_sorted == sorted(amounts_sorted)
+
+    # Sort by amount descending
+    response = await api_client.get("/api/v1/deals?order_by=amount&order=desc", headers=HEADERS)
+    assert response.status_code == 200
+    data = response.json()
+    amounts_sorted = [Decimal(item["amount"]) for item in data["items"]]
+    assert amounts_sorted == sorted(amounts_sorted, reverse=True)
+
+
+@pytest.mark.asyncio
+async def test_deals_list_combined_filters(
+    api_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await seed_user_and_org(db_session)
+    await seed_organization_member(db_session, user_id=1, organization_id=1)
+    await seed_contact(db_session, organization_id=1, owner_id=1)
+
+    repository = SQLAlchemyDealRepository(session=db_session)
+
+    # Create deals with different combinations
+    payload1 = DealCreate(contact_id=1, title="Deal 1", amount=Decimal("1000.00"), currency="USD")
+    deal1 = await repository.create(organization_id=1, owner_id=1, payload=payload1)
+    await repository.update(
+        organization_id=1,
+        deal_id=deal1.id,
+        payload=DealUpdate(status=DealStatus.NEW, stage=DealStage.QUALIFICATION),
+    )
+    await db_session.commit()
+
+    payload2 = DealCreate(contact_id=1, title="Deal 2", amount=Decimal("2000.00"), currency="USD")
+    deal2 = await repository.create(organization_id=1, owner_id=1, payload=payload2)
+    await repository.update(
+        organization_id=1,
+        deal_id=deal2.id,
+        payload=DealUpdate(status=DealStatus.IN_PROGRESS, stage=DealStage.PROPOSAL),
+    )
+    await db_session.commit()
+
+    payload3 = DealCreate(contact_id=1, title="Deal 3", amount=Decimal("3000.00"), currency="USD")
+    deal3 = await repository.create(organization_id=1, owner_id=1, payload=payload3)
+    await repository.update(
+        organization_id=1,
+        deal_id=deal3.id,
+        payload=DealUpdate(status=DealStatus.NEW, stage=DealStage.QUALIFICATION),
+    )
+    await db_session.commit()
+
+    # Combine filters: status=NEW, min_amount=1500, stage=qualification
+    response = await api_client.get(
+        "/api/v1/deals?status=new&min_amount=1500.00&stage=qualification",
+        headers=HEADERS,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert data["meta"]["total"] == 1
+    assert data["items"][0]["title"] == "Deal 3"

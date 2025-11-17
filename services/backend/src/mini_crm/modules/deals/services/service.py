@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from fastapi import HTTPException, status
+from decimal import Decimal
+
+from fastapi import HTTPException
+from fastapi import status as http_status
 
 from mini_crm.modules.activities.dto.schemas import ActivityCreate
 from mini_crm.modules.activities.repositories.repository import AbstractActivityRepository
@@ -25,10 +28,37 @@ class DealService:
         self.activity_repository = activity_repository
 
     async def list_deals(
-        self, context: RequestContext, page: int, page_size: int
+        self,
+        context: RequestContext,
+        page: int,
+        page_size: int,
+        status: list[DealStatus] | None = None,
+        min_amount: Decimal | None = None,
+        max_amount: Decimal | None = None,
+        stage: DealStage | None = None,
+        owner_id: int | None = None,
+        order_by: str | None = None,
+        order: str = "asc",
     ) -> PaginatedDeals:
+        # Check permissions for owner_id filter
+        if owner_id is not None:
+            if context.organization.role == UserRole.MEMBER:
+                raise HTTPException(
+                    status_code=http_status.HTTP_403_FORBIDDEN,
+                    detail="Filtering by owner_id is not allowed for member role",
+                )
+
         items, total = await self.repository.list(
-            context.organization.organization_id, page=page, page_size=page_size
+            context.organization.organization_id,
+            page=page,
+            page_size=page_size,
+            status=status,
+            min_amount=min_amount,
+            max_amount=max_amount,
+            stage=stage,
+            owner_id=owner_id,
+            order_by=order_by,
+            order=order,
         )
         meta = PaginationMeta(page=page, page_size=page_size, total=total)
         return PaginatedDeals(items=items, meta=meta)
@@ -60,7 +90,7 @@ class DealService:
             )
             if old_deal is None:
                 raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
+                    status_code=http_status.HTTP_404_NOT_FOUND,
                     detail="Deal not found",
                 )
             old_status = old_deal.status
@@ -78,7 +108,7 @@ class DealService:
                 pass
             elif old_deal.owner_id != context.user.id:
                 raise HTTPException(
-                    status_code=status.HTTP_403_FORBIDDEN,
+                    status_code=http_status.HTTP_403_FORBIDDEN,
                     detail="You can only update your own deals",
                 )
 
@@ -94,7 +124,7 @@ class DealService:
             )
             if amount_to_check is not None and amount_to_check <= 0:
                 raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
+                    status_code=http_status.HTTP_400_BAD_REQUEST,
                     detail="Amount must be positive for won deals",
                 )
 
@@ -124,7 +154,7 @@ class DealService:
             if self._is_stage_rollback(old_stage_enum, new_stage_enum):
                 if context.organization.role not in {UserRole.ADMIN, UserRole.OWNER}:
                     raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
+                        status_code=http_status.HTTP_403_FORBIDDEN,
                         detail="Stage rollback is not allowed for your role",
                     )
 

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 from typing import cast
 
 from fastapi import HTTPException, status
@@ -19,22 +20,74 @@ class SQLAlchemyDealRepository(AbstractDealRepository):
         self.session = session
 
     async def list(
-        self, organization_id: int, *, page: int, page_size: int
+        self,
+        organization_id: int,
+        *,
+        page: int,
+        page_size: int,
+        status: list[DealStatus] | None = None,
+        min_amount: Decimal | None = None,
+        max_amount: Decimal | None = None,
+        stage: DealStage | None = None,
+        owner_id: int | None = None,
+        order_by: str | None = None,
+        order: str = "asc",
     ) -> tuple[list[DealResponse], int]:
         offset = max(page - 1, 0) * page_size
-        stmt = (
-            select(Deal)
-            .where(Deal.organization_id == organization_id)
-            .order_by(Deal.id)
-            .offset(offset)
-            .limit(page_size)
-        )
+
+        # Build base query with filters
+        stmt = select(Deal).where(Deal.organization_id == organization_id)
+
+        # Apply filters
+        if status:
+            stmt = stmt.where(Deal.status.in_(status))
+        if min_amount is not None:
+            stmt = stmt.where(Deal.amount >= min_amount)
+        if max_amount is not None:
+            stmt = stmt.where(Deal.amount <= max_amount)
+        if stage is not None:
+            stmt = stmt.where(Deal.stage == stage)
+        if owner_id is not None:
+            stmt = stmt.where(Deal.owner_id == owner_id)
+
+        # Apply sorting
+        if order_by == "created_at":
+            if order == "desc":
+                stmt = stmt.order_by(Deal.created_at.desc())
+            else:
+                stmt = stmt.order_by(Deal.created_at.asc())
+        elif order_by == "amount":
+            if order == "desc":
+                stmt = stmt.order_by(Deal.amount.desc())
+            else:
+                stmt = stmt.order_by(Deal.amount.asc())
+        else:
+            if order == "desc":
+                stmt = stmt.order_by(Deal.id.desc())
+            else:
+                stmt = stmt.order_by(Deal.id.asc())
+
+        stmt = stmt.offset(offset).limit(page_size)
+
         result = await self.session.scalars(stmt)
         deals = result.all()
 
+        # Build count query with same filters
         count_stmt = (
             select(func.count()).select_from(Deal).where(Deal.organization_id == organization_id)
         )
+
+        if status:
+            count_stmt = count_stmt.where(Deal.status.in_(status))
+        if min_amount is not None:
+            count_stmt = count_stmt.where(Deal.amount >= min_amount)
+        if max_amount is not None:
+            count_stmt = count_stmt.where(Deal.amount <= max_amount)
+        if stage is not None:
+            count_stmt = count_stmt.where(Deal.stage == stage)
+        if owner_id is not None:
+            count_stmt = count_stmt.where(Deal.owner_id == owner_id)
+
         total = await self.session.scalar(count_stmt)
 
         items = [DealResponse.model_validate(deal) for deal in deals]

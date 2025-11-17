@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from decimal import Decimal
+
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mini_crm.core.dependencies import get_db_session, get_request_context
@@ -11,6 +13,7 @@ from mini_crm.modules.deals.dto.schemas import DealCreate, DealResponse, DealUpd
 from mini_crm.modules.deals.repositories.repository import AbstractDealRepository
 from mini_crm.modules.deals.repositories.sqlalchemy import SQLAlchemyDealRepository
 from mini_crm.modules.deals.services.service import DealService
+from mini_crm.shared.enums import DealStage, DealStatus
 
 router = APIRouter(prefix="/deals", tags=["deals"])
 
@@ -37,11 +40,38 @@ def get_deal_service(
 @router.get("", response_model=PaginatedDeals)
 async def list_deals(
     page: int = 1,
-    page_size: int = 50,
+    page_size: int = Query(default=50, le=100),
+    status: list[str] | None = Query(default=None),
+    min_amount: Decimal | None = None,
+    max_amount: Decimal | None = None,
+    stage: str | None = None,
+    owner_id: int | None = None,
+    order_by: str | None = Query(default=None, pattern="^(created_at|amount)$"),
+    order: str = Query(default="asc", pattern="^(asc|desc)$"),
     context: RequestContext = Depends(get_request_context),
     service: DealService = Depends(get_deal_service),
 ) -> PaginatedDeals:
-    return await service.list_deals(context, page=page, page_size=page_size)
+    # Convert string parameters to enums
+    status_enums: list[DealStatus] | None = None
+    if status:
+        status_enums = [DealStatus(s) for s in status]
+
+    stage_enum: DealStage | None = None
+    if stage:
+        stage_enum = DealStage(stage)
+
+    return await service.list_deals(
+        context,
+        page=page,
+        page_size=page_size,
+        status=status_enums,
+        min_amount=min_amount,
+        max_amount=max_amount,
+        stage=stage_enum,
+        owner_id=owner_id,
+        order_by=order_by,
+        order=order,
+    )
 
 
 @router.post("", response_model=DealResponse, status_code=201)
