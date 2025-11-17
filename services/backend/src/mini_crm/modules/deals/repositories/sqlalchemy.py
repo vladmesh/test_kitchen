@@ -84,18 +84,8 @@ class SQLAlchemyDealRepository(AbstractDealRepository):
                 detail="Deal not found",
             )
 
-        # Validate amount > 0 for won status
-        update_data = payload.model_dump(exclude_none=True)
-        new_status = update_data.get("status", deal.status)
-        if new_status == DealStatus.WON:
-            amount_to_check = update_data.get("amount", deal.amount)
-            if amount_to_check <= 0:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Amount must be positive for won deals",
-                )
-
         # Update fields
+        update_data = payload.model_dump(exclude_none=True)
         for key, value in update_data.items():
             setattr(deal, key, value)
 

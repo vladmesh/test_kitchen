@@ -69,10 +69,34 @@ class DealService:
             # Fallback for InMemory repository (shouldn't happen in production)
             old_status = DealStatus.NEW
             old_stage = DealStage.QUALIFICATION
+            old_deal = None
+
+        # Check member ownership: member can only update their own deals
+        if context.organization.role == UserRole.MEMBER:
+            if old_deal is None:
+                # For InMemory repository, we can't check ownership
+                pass
+            elif old_deal.owner_id != context.user.id:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You can only update your own deals",
+                )
 
         update_data = payload.model_dump(exclude_none=True)
         new_status = update_data.get("status")
         new_stage = update_data.get("stage")
+        new_amount = update_data.get("amount")
+
+        # Validate amount > 0 for won status
+        if new_status == DealStatus.WON:
+            amount_to_check = (
+                new_amount if new_amount is not None else (old_deal.amount if old_deal else None)
+            )
+            if amount_to_check is not None and amount_to_check <= 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Amount must be positive for won deals",
+                )
 
         # Normalize enum values to strings for comparison
         old_status_str = old_status.value if isinstance(old_status, DealStatus) else str(old_status)
