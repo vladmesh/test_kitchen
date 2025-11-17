@@ -18,6 +18,14 @@ class AbstractContactRepository(ABC):
     ) -> ContactResponse:
         raise NotImplementedError
 
+    @abstractmethod
+    async def get_by_id(self, organization_id: int, contact_id: int) -> ContactResponse | None:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def delete(self, organization_id: int, contact_id: int) -> None:
+        raise NotImplementedError
+
 
 class InMemoryContactRepository(AbstractContactRepository):
     def __init__(self) -> None:
@@ -36,3 +44,12 @@ class InMemoryContactRepository(AbstractContactRepository):
         contact = ContactResponse(id=self._counter, owner_id=owner_id, **payload.model_dump())
         self._contacts.append(contact)
         return contact
+
+    async def get_by_id(self, organization_id: int, contact_id: int) -> ContactResponse | None:  # noqa: ARG002
+        for contact in self._contacts:
+            if contact.id == contact_id:
+                return contact
+        return None
+
+    async def delete(self, organization_id: int, contact_id: int) -> None:  # noqa: ARG002
+        self._contacts = [c for c in self._contacts if c.id != contact_id]

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mini_crm.core.dependencies import get_db_session, get_request_context
@@ -42,3 +42,13 @@ async def create_contact(
     service: ContactService = Depends(get_contact_service),
 ) -> ContactResponse:
     return await service.create_contact(context, payload)
+
+
+@router.delete("/{contact_id}", status_code=204)
+async def delete_contact(
+    contact_id: int,
+    context: RequestContext = Depends(get_request_context),
+    service: ContactService = Depends(get_contact_service),
+) -> Response:
+    await service.delete_contact(context, contact_id)
+    return Response(status_code=204)

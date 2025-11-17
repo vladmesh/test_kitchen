@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from decimal import Decimal
 
 import pytest
 from httpx import AsyncClient
@@ -8,9 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from mini_crm.modules.auth.models import OrganizationMember, User
 from mini_crm.modules.contacts.dto.schemas import ContactCreate
+from mini_crm.modules.contacts.models import Contact
 from mini_crm.modules.contacts.repositories.sqlalchemy import SQLAlchemyContactRepository
+from mini_crm.modules.deals.models import Deal
 from mini_crm.modules.organizations.models import Organization
-from mini_crm.shared.enums import UserRole
+from mini_crm.shared.enums import DealStage, DealStatus, UserRole
 
 HEADERS = {"Authorization": "Bearer test", "X-Organization-Id": "1"}
 
@@ -41,6 +44,21 @@ async def seed_organization_member(
     await session.commit()
     await session.refresh(member)
     return member
+
+
+async def seed_contact(session: AsyncSession, organization_id: int, owner_id: int) -> Contact:
+    contact = Contact(
+        id=1,
+        organization_id=organization_id,
+        owner_id=owner_id,
+        name="John Doe",
+        email="john@example.com",
+        phone="+111111",
+        created_at=datetime.now(tz=UTC),
+    )
+    session.add(contact)
+    await session.commit()
+    return contact
 
 
 @pytest.mark.asyncio
@@ -79,3 +97,194 @@ async def test_contact_crud_flow(api_client: AsyncClient, db_session: AsyncSessi
     data = list_response.json()
     assert data["meta"]["total"] == 1
     assert data["items"][0]["name"] == "John"
+
+
+@pytest.mark.asyncio
+async def test_delete_contact_success(api_client: AsyncClient, db_session: AsyncSession) -> None:
+    await seed_user_and_org(db_session)
+    await seed_organization_member(db_session, user_id=1, organization_id=1)
+    await seed_contact(db_session, organization_id=1, owner_id=1)
+
+    delete_response = await api_client.delete("/api/v1/contacts/1", headers=HEADERS)
+    assert delete_response.status_code == 204
+
+    # Verify contact is deleted
+    list_response = await api_client.get("/api/v1/contacts", headers=HEADERS)
+    assert list_response.status_code == 200
+    data = list_response.json()
+    assert data["meta"]["total"] == 0
+
+
+@pytest.mark.asyncio
+async def test_delete_contact_with_deals_fails(
+    api_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await seed_user_and_org(db_session)
+    await seed_organization_member(db_session, user_id=1, organization_id=1)
+    await seed_contact(db_session, organization_id=1, owner_id=1)
+
+    # Create a deal for the contact
+    deal = Deal(
+        id=1,
+        organization_id=1,
+        contact_id=1,
+        owner_id=1,
+        title="Test Deal",
+        amount=Decimal("1000.00"),
+        currency="USD",
+        status=DealStatus.NEW,
+        stage=DealStage.QUALIFICATION,
+        created_at=datetime.now(tz=UTC),
+        updated_at=datetime.now(tz=UTC),
+    )
+    db_session.add(deal)
+    await db_session.commit()
+
+    delete_response = await api_client.delete("/api/v1/contacts/1", headers=HEADERS)
+    assert delete_response.status_code == 409
+    assert "Cannot delete contact with existing deals" in delete_response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_delete_contact_member_permission_check(
+    api_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    from fastapi import Depends
+
+    from mini_crm.app.main import app
+    from mini_crm.core.dependencies import get_request_context, get_request_user
+    from mini_crm.modules.common.context import OrganizationContext, RequestContext, RequestUser
+    from mini_crm.modules.organizations.repositories.sqlalchemy import (
+        SQLAlchemyOrganizationRepository,
+    )
+
+    await seed_user_and_org(db_session)
+    await seed_organization_member(db_session, user_id=1, organization_id=1, role=UserRole.OWNER)
+
+    # Create second user
+    user2 = User(
+        id=2,
+        email="member@example.com",
+        hashed_password="hashed",
+        name="Member",
+        created_at=datetime.now(tz=UTC),
+    )
+    db_session.add(user2)
+    await db_session.commit()
+    await seed_organization_member(db_session, user_id=2, organization_id=1, role=UserRole.MEMBER)
+
+    # Create contact owned by user 1
+    await seed_contact(db_session, organization_id=1, owner_id=1)
+
+    # Override get_request_user to return user 2
+    async def override_get_request_user() -> RequestUser:
+        return RequestUser(id=2, email="member@example.com", role=UserRole.MEMBER)
+
+    from fastapi import Header
+
+    from mini_crm.core.dependencies import get_db_session
+
+    async def override_get_request_context(
+        user: RequestUser = Depends(override_get_request_user),
+        organization_id: int | None = Header(default=None, alias="X-Organization-Id"),
+        session: AsyncSession = Depends(get_db_session),
+    ) -> RequestContext:
+        if organization_id is None:
+            organization_id = 1
+        repository = SQLAlchemyOrganizationRepository(session)
+        membership = await repository.get_membership(user.id, organization_id)
+        role = (
+            membership.role if isinstance(membership.role, UserRole) else UserRole(membership.role)
+        )
+        org_context = OrganizationContext(organization_id=organization_id, role=role)
+        return RequestContext(user=user, organization=org_context)
+
+    app.dependency_overrides[get_request_user] = override_get_request_user
+    app.dependency_overrides[get_request_context] = override_get_request_context
+
+    try:
+        # Try to delete contact owned by user 1 as user 2 (member) - should fail
+        member_headers = {"Authorization": "Bearer test", "X-Organization-Id": "1"}
+        delete_response = await api_client.delete("/api/v1/contacts/1", headers=member_headers)
+        assert delete_response.status_code == 403
+        assert "You can only delete your own contacts" in delete_response.json()["detail"]
+    finally:
+        app.dependency_overrides.pop(get_request_user, None)
+        app.dependency_overrides.pop(get_request_context, None)
+
+
+@pytest.mark.asyncio
+async def test_delete_contact_member_can_delete_own(
+    api_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    from fastapi import Depends
+
+    from mini_crm.app.main import app
+    from mini_crm.core.dependencies import get_request_context, get_request_user
+    from mini_crm.modules.common.context import OrganizationContext, RequestContext, RequestUser
+    from mini_crm.modules.organizations.repositories.sqlalchemy import (
+        SQLAlchemyOrganizationRepository,
+    )
+
+    await seed_user_and_org(db_session)
+    await seed_organization_member(db_session, user_id=1, organization_id=1, role=UserRole.OWNER)
+
+    # Create second user
+    user2 = User(
+        id=2,
+        email="member@example.com",
+        hashed_password="hashed",
+        name="Member",
+        created_at=datetime.now(tz=UTC),
+    )
+    db_session.add(user2)
+    await db_session.commit()
+    await seed_organization_member(db_session, user_id=2, organization_id=1, role=UserRole.MEMBER)
+
+    # Create contact owned by user 2
+    contact = Contact(
+        id=1,
+        organization_id=1,
+        owner_id=2,
+        name="Member Contact",
+        email="member@example.com",
+        phone="+222222",
+        created_at=datetime.now(tz=UTC),
+    )
+    db_session.add(contact)
+    await db_session.commit()
+
+    # Override get_request_user to return user 2
+    async def override_get_request_user() -> RequestUser:
+        return RequestUser(id=2, email="member@example.com", role=UserRole.MEMBER)
+
+    from fastapi import Header
+
+    from mini_crm.core.dependencies import get_db_session
+
+    async def override_get_request_context(
+        user: RequestUser = Depends(override_get_request_user),
+        organization_id: int | None = Header(default=None, alias="X-Organization-Id"),
+        session: AsyncSession = Depends(get_db_session),
+    ) -> RequestContext:
+        if organization_id is None:
+            organization_id = 1
+        repository = SQLAlchemyOrganizationRepository(session)
+        membership = await repository.get_membership(user.id, organization_id)
+        role = (
+            membership.role if isinstance(membership.role, UserRole) else UserRole(membership.role)
+        )
+        org_context = OrganizationContext(organization_id=organization_id, role=role)
+        return RequestContext(user=user, organization=org_context)
+
+    app.dependency_overrides[get_request_user] = override_get_request_user
+    app.dependency_overrides[get_request_context] = override_get_request_context
+
+    try:
+        # User 2 (member) can delete their own contact
+        member_headers = {"Authorization": "Bearer test", "X-Organization-Id": "1"}
+        delete_response = await api_client.delete("/api/v1/contacts/1", headers=member_headers)
+        assert delete_response.status_code == 204
+    finally:
+        app.dependency_overrides.pop(get_request_user, None)
+        app.dependency_overrides.pop(get_request_context, None)

@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mini_crm.modules.contacts.dto.schemas import ContactCreate, ContactResponse
 from mini_crm.modules.contacts.models import Contact
 from mini_crm.modules.contacts.repositories.repository import AbstractContactRepository
+from mini_crm.modules.deals.models import Deal
 
 
 class SQLAlchemyContactRepository(AbstractContactRepository):
@@ -51,3 +53,38 @@ class SQLAlchemyContactRepository(AbstractContactRepository):
         await self.session.flush()
         await self.session.refresh(contact)
         return ContactResponse.model_validate(contact)
+
+    async def get_by_id(self, organization_id: int, contact_id: int) -> ContactResponse | None:
+        stmt = select(Contact).where(
+            Contact.id == contact_id,
+            Contact.organization_id == organization_id,
+        )
+        contact = await self.session.scalar(stmt)
+        if contact is None:
+            return None
+        return ContactResponse.model_validate(contact)
+
+    async def delete(self, organization_id: int, contact_id: int) -> None:
+        # Check if contact exists and belongs to organization
+        contact_stmt = select(Contact).where(
+            Contact.id == contact_id,
+            Contact.organization_id == organization_id,
+        )
+        contact = await self.session.scalar(contact_stmt)
+        if contact is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Contact not found",
+            )
+
+        # Check if contact has any deals
+        deals_stmt = select(func.count()).select_from(Deal).where(Deal.contact_id == contact_id)
+        deals_count = await self.session.scalar(deals_stmt)
+        if deals_count and deals_count > 0:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Cannot delete contact with existing deals",
+            )
+
+        await self.session.delete(contact)
+        await self.session.flush()
