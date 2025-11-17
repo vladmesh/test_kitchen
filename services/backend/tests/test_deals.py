@@ -7,7 +7,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from mini_crm.modules.auth.models import User
+from mini_crm.modules.auth.models import OrganizationMember, User
 from mini_crm.modules.contacts.models import Contact
 from mini_crm.modules.deals.dto.schemas import DealCreate
 from mini_crm.modules.deals.repositories.sqlalchemy import SQLAlchemyDealRepository
@@ -29,6 +29,20 @@ async def seed_user_and_org(session: AsyncSession) -> None:
     )
     session.add_all([organization, user])
     await session.commit()
+
+
+async def seed_organization_member(
+    session: AsyncSession, user_id: int, organization_id: int, role: UserRole = UserRole.OWNER
+) -> OrganizationMember:
+    member = OrganizationMember(
+        user_id=user_id,
+        organization_id=organization_id,
+        role=role,
+    )
+    session.add(member)
+    await session.flush()
+    await session.refresh(member)
+    return member
 
 
 async def seed_contact(session: AsyncSession, organization_id: int, owner_id: int) -> Contact:
@@ -143,6 +157,7 @@ async def test_deal_repository_update_won_with_zero_amount(db_session: AsyncSess
 @pytest.mark.asyncio
 async def test_deal_crud_flow(api_client: AsyncClient, db_session: AsyncSession) -> None:
     await seed_user_and_org(db_session)
+    await seed_organization_member(db_session, user_id=1, organization_id=1)
     await seed_contact(db_session, organization_id=1, owner_id=1)
 
     create_payload = {
@@ -172,6 +187,7 @@ async def test_deal_crud_flow(api_client: AsyncClient, db_session: AsyncSession)
 @pytest.mark.asyncio
 async def test_deal_update_status(api_client: AsyncClient, db_session: AsyncSession) -> None:
     await seed_user_and_org(db_session)
+    await seed_organization_member(db_session, user_id=1, organization_id=1)
     await seed_contact(db_session, organization_id=1, owner_id=1)
 
     # Create deal
@@ -204,6 +220,7 @@ async def test_deal_update_won_with_zero_amount(
     api_client: AsyncClient, db_session: AsyncSession
 ) -> None:
     await seed_user_and_org(db_session)
+    await seed_organization_member(db_session, user_id=1, organization_id=1)
     await seed_contact(db_session, organization_id=1, owner_id=1)
 
     # Create deal with zero amount
@@ -245,6 +262,7 @@ async def test_deal_update_creates_activity(
 
     try:
         await seed_user_and_org(db_session)
+        await seed_organization_member(db_session, user_id=1, organization_id=1)
         await seed_contact(db_session, organization_id=1, owner_id=1)
 
         # Create deal

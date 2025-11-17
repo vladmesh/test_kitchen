@@ -7,7 +7,20 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from mini_crm.core.db import get_session
 from mini_crm.modules.common.context import OrganizationContext, RequestContext, RequestUser
+from mini_crm.modules.organizations.repositories.sqlalchemy import (
+    SQLAlchemyOrganizationRepository,
+)
 from mini_crm.shared.enums import UserRole
+
+
+async def get_db_session() -> AsyncIterator[AsyncSession]:
+    async with get_session() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
 
 
 async def get_request_user(
@@ -27,22 +40,21 @@ async def get_request_user(
 async def get_request_context(
     user: RequestUser = Depends(get_request_user),
     organization_id: int | None = Header(default=None, alias="X-Organization-Id"),
+    session: AsyncSession = Depends(get_db_session),
 ) -> RequestContext:
     if organization_id is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="X-Organization-Id header required"
         )
 
-    # TODO: fetch membership/role from DB or cache.
-    org_context = OrganizationContext(organization_id=organization_id, role=user.role)
+    repository = SQLAlchemyOrganizationRepository(session)
+    membership = await repository.get_membership(user.id, organization_id)
+
+    if membership is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="User is not a member of this organization",
+        )
+
+    org_context = OrganizationContext(organization_id=organization_id, role=membership.role)
     return RequestContext(user=user, organization=org_context)
-
-
-async def get_db_session() -> AsyncIterator[AsyncSession]:
-    async with get_session() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise

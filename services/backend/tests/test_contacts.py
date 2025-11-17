@@ -6,10 +6,11 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from mini_crm.modules.auth.models import User
+from mini_crm.modules.auth.models import OrganizationMember, User
 from mini_crm.modules.contacts.dto.schemas import ContactCreate
 from mini_crm.modules.contacts.repositories.sqlalchemy import SQLAlchemyContactRepository
 from mini_crm.modules.organizations.models import Organization
+from mini_crm.shared.enums import UserRole
 
 HEADERS = {"Authorization": "Bearer test", "X-Organization-Id": "1"}
 
@@ -26,6 +27,20 @@ async def seed_user_and_org(session: AsyncSession) -> None:
     )
     session.add_all([organization, user])
     await session.commit()
+
+
+async def seed_organization_member(
+    session: AsyncSession, user_id: int, organization_id: int, role: UserRole = UserRole.OWNER
+) -> OrganizationMember:
+    member = OrganizationMember(
+        user_id=user_id,
+        organization_id=organization_id,
+        role=role,
+    )
+    session.add(member)
+    await session.flush()
+    await session.refresh(member)
+    return member
 
 
 @pytest.mark.asyncio
@@ -47,6 +62,7 @@ async def test_sqlalchemy_contact_repository(db_session: AsyncSession) -> None:
 @pytest.mark.asyncio
 async def test_contact_crud_flow(api_client: AsyncClient, db_session: AsyncSession) -> None:
     await seed_user_and_org(db_session)
+    await seed_organization_member(db_session, user_id=1, organization_id=1)
 
     create_payload = {"name": "John", "email": "john@example.com", "phone": "+111111"}
     create_response = await api_client.post(
