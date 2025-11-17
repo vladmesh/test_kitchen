@@ -23,13 +23,14 @@ class ActivityService:
     async def create_activity(
         self, context: RequestContext, deal_id: int, payload: ActivityCreate
     ) -> ActivityResponse:
-        if payload.type != ActivityType.COMMENT and payload.payload is None:
+        # Only comments can be created via API; other types are created automatically by business logic
+        if payload.type != ActivityType.COMMENT:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="payload required for this activity type",
+                detail="Only comment activities can be created via API",
             )
         # For comments, use user id as author; for system events, author_id is None
-        author_id = context.user.id if payload.type == ActivityType.COMMENT else None
+        author_id = context.user.id
         return await self.repository.create(
             context.organization.organization_id, deal_id, payload, author_id=author_id
         )
