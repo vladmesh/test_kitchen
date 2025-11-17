@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build tools image
+      run: docker build -f infra/Dockerfile.tools -t test-kitchen-tools .
+
+    - name: Run lint
+      run: docker run --rm -v $(pwd):/workspace test-kitchen-tools ruff check services
+
+  typecheck:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build tools image
+      run: docker build -f infra/Dockerfile.tools -t test-kitchen-tools .
+
+    - name: Run typecheck
+      run: docker run --rm -v $(pwd):/workspace test-kitchen-tools mypy services/backend/src
+
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Build test image
+      run: docker compose -f infra/docker-compose.test.yml build backend-tests
+
+    - name: Run tests
+      run: docker compose -f infra/docker-compose.test.yml run --rm backend-tests
