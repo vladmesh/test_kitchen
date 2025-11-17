@@ -40,7 +40,7 @@ async def seed_organization_member(
         role=role,
     )
     session.add(member)
-    await session.flush()
+    await session.commit()
     await session.refresh(member)
     return member
 
