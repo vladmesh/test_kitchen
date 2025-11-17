@@ -1,9 +1,8 @@
 COMPOSE ?= docker compose
 DEV_COMPOSE := infra/docker-compose.dev.yml
 TEST_COMPOSE := infra/docker-compose.test.yml
-CI_COMPOSE := infra/docker-compose.ci.yml
 
-.PHONY: help up down logs restart ps shell test tests tests-ci lint typecheck format migrate makemigration
+.PHONY: help up down logs restart ps shell test tests lint typecheck format migrate makemigration
 
 help:
 	@echo "Available targets:"
@@ -11,7 +10,6 @@ help:
 	@echo "  make down      # Stop dev stack"
 	@echo "  make logs      # Tail dev logs"
 	@echo "  make tests     # Run backend test suite (docker only)"
-	@echo "  make tests-ci   # Run backend test suite in CI (docker only)"
 	@echo "  make lint      # Run ruff lint"
 	@echo "  make typecheck # Run mypy"
 	@echo "  make format    # Auto-format via ruff"
@@ -40,9 +38,6 @@ test:
 
 tests:
 	$(COMPOSE) -f $(TEST_COMPOSE) run --rm backend-tests
-
-tests-ci:
-	$(COMPOSE) -f $(CI_COMPOSE) run --rm backend-tests
 
 lint:
 	docker build -f infra/Dockerfile.tools -t test-kitchen-tools .
