@@ -174,6 +174,7 @@ class DealService:
                     context.organization.organization_id,
                     deal_id,
                     activity_payload,
+                    author_id=context.user.id,
                 )
 
             if new_stage is not None and new_stage_str != old_stage_str:
@@ -185,6 +186,7 @@ class DealService:
                     context.organization.organization_id,
                     deal_id,
                     activity_payload,
+                    author_id=context.user.id,
                 )
 
         return updated_deal

@@ -37,6 +37,8 @@ class InMemoryActivityRepository(AbstractActivityRepository):
         author_id: int | None = None,
     ) -> ActivityResponse:  # noqa: ARG002
         self._counter += 1
-        activity = ActivityResponse(id=self._counter, deal_id=deal_id, **payload.model_dump())
+        activity = ActivityResponse(
+            id=self._counter, deal_id=deal_id, author_id=author_id, **payload.model_dump()
+        )
         self._activities.append(activity)
         return activity

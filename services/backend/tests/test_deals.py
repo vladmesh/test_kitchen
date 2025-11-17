@@ -311,6 +311,69 @@ async def test_deal_update_creates_activity(
 
 
 @pytest.mark.asyncio
+async def test_deal_update_activity_has_author_id(
+    api_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    from mini_crm.app.main import app
+    from mini_crm.modules.activities.repositories.repository import InMemoryActivityRepository
+    from mini_crm.modules.deals.api.router import get_activity_repository
+
+    # Use shared activity repository instance
+    shared_activity_repo = InMemoryActivityRepository()
+    app.dependency_overrides[get_activity_repository] = lambda: shared_activity_repo
+
+    try:
+        await seed_user_and_org(db_session)
+        await seed_organization_member(db_session, user_id=1, organization_id=1)
+        await seed_contact(db_session, organization_id=1, owner_id=1)
+
+        # Create deal
+        create_payload = {
+            "contact_id": 1,
+            "title": "Test Deal",
+            "amount": "5000.00",
+            "currency": "USD",
+        }
+        create_response = await api_client.post(
+            "/api/v1/deals",
+            json=create_payload,
+            headers=HEADERS,
+        )
+        deal_id = create_response.json()["id"]
+
+        # Update status - should create activity with author_id
+        update_payload = {"status": DealStatus.WON.value}
+        update_response = await api_client.patch(
+            f"/api/v1/deals/{deal_id}",
+            json=update_payload,
+            headers=HEADERS,
+        )
+        assert update_response.status_code == 200
+
+        # Check activities have author_id set
+        activities = await shared_activity_repo.list(organization_id=1, deal_id=deal_id)
+        assert len(activities) == 1
+        assert activities[0].author_id == 1
+        assert activities[0].type.value == "status_changed"
+
+        # Update stage - should create activity with author_id
+        update_payload = {"stage": DealStage.PROPOSAL.value}
+        update_response = await api_client.patch(
+            f"/api/v1/deals/{deal_id}",
+            json=update_payload,
+            headers=HEADERS,
+        )
+        assert update_response.status_code == 200
+
+        # Check both activities have author_id set
+        activities = await shared_activity_repo.list(organization_id=1, deal_id=deal_id)
+        assert len(activities) == 2
+        assert all(activity.author_id == 1 for activity in activities)
+    finally:
+        app.dependency_overrides.pop(get_activity_repository, None)
+
+
+@pytest.mark.asyncio
 async def test_deal_stage_rollback_permission(db_session: AsyncSession) -> None:
     from mini_crm.modules.activities.repositories.repository import InMemoryActivityRepository
     from mini_crm.modules.common.context import OrganizationContext, RequestContext, RequestUser

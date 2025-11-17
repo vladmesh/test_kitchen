@@ -12,3 +12,4 @@ class ActivityCreate(DTO):
 class ActivityResponse(ActivityCreate):
     id: int
     deal_id: int
+    author_id: int | None
