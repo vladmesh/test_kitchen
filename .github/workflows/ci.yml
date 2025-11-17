@@ -17,7 +17,7 @@ jobs:
       run: docker build -f infra/Dockerfile.tools -t test-kitchen-tools .
 
     - name: Run lint
-      run: docker run --rm -v $(pwd):/workspace test-kitchen-tools ruff check services
+      run: docker run --rm -v $(pwd):/workspace test-kitchen-tools ruff check .
 
   typecheck:
     runs-on: ubuntu-latest
