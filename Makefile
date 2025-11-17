@@ -38,15 +38,15 @@ test:
 	$(COMPOSE) -f $(TEST_COMPOSE) run --rm backend-tests
 
 lint:
-	docker build -f infra/Dockerfile.tools -t test-kitchen-tools infra
+	docker build -f infra/Dockerfile.tools -t test-kitchen-tools .
 	docker run --rm -v $(PWD):/workspace test-kitchen-tools ruff check services
 
 typecheck:
-	docker build -f infra/Dockerfile.tools -t test-kitchen-tools infra
+	docker build -f infra/Dockerfile.tools -t test-kitchen-tools .
 	docker run --rm -v $(PWD):/workspace test-kitchen-tools mypy services/backend/src
 
 format:
-	docker build -f infra/Dockerfile.tools -t test-kitchen-tools infra
+	docker build -f infra/Dockerfile.tools -t test-kitchen-tools .
 	docker run --rm -v $(PWD):/workspace test-kitchen-tools sh -c "ruff format services && ruff check --fix services"
 
 migrate:

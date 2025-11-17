@@ -1,13 +1,24 @@
 FROM python:3.11-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    POETRY_HOME=/opt/poetry \
+    POETRY_VERSION=1.8.2 \
+    PATH="/opt/poetry/bin:$PATH"
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends git \
+    && apt-get install -y --no-install-recommends build-essential curl git \
+    && curl -sSL https://install.python-poetry.org | python3 - \
     && pip install --no-cache-dir ruff mypy \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /workspace
+
+COPY services/backend/pyproject.toml services/backend/poetry.lock* services/backend/
+
+RUN cd services/backend \
+    && poetry config virtualenvs.create false \
+    && poetry install --no-interaction --no-ansi --with dev --no-root \
+    && cd /workspace
 

@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from mini_crm.core.db import Base
+
+if TYPE_CHECKING:
+    from mini_crm.modules.auth.models import OrganizationMember
+    from mini_crm.modules.tags.models import Tag
 
 
 class Organization(Base):
