@@ -1,7 +1,11 @@
 from __future__ import annotations
 
-from fastapi import Depends, Header, HTTPException, status
+from collections.abc import AsyncIterator
 
+from fastapi import Depends, Header, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from mini_crm.core.db import get_session
 from mini_crm.modules.common.context import OrganizationContext, RequestContext, RequestUser
 from mini_crm.shared.enums import UserRole
 
@@ -32,3 +36,13 @@ async def get_request_context(
     # TODO: fetch membership/role from DB or cache.
     org_context = OrganizationContext(organization_id=organization_id, role=user.role)
     return RequestContext(user=user, organization=org_context)
+
+
+async def get_db_session() -> AsyncIterator[AsyncSession]:
+    async with get_session() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise

@@ -1,22 +1,28 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from mini_crm.core.dependencies import get_request_context
+from mini_crm.core.dependencies import get_db_session, get_request_context
 from mini_crm.modules.common.context import RequestContext
 from mini_crm.modules.contacts.dto.schemas import ContactCreate, ContactResponse, PaginatedContacts
-from mini_crm.modules.contacts.repositories.repository import InMemoryContactRepository
+from mini_crm.modules.contacts.repositories.repository import AbstractContactRepository
+from mini_crm.modules.contacts.repositories.sqlalchemy import SQLAlchemyContactRepository
 from mini_crm.modules.contacts.services.service import ContactService
 
 router = APIRouter(prefix="/contacts", tags=["contacts"])
 
 
-_contacts_repository = InMemoryContactRepository()
-_contacts_service = ContactService(repository=_contacts_repository)
+def get_contact_repository(
+    session: AsyncSession = Depends(get_db_session),
+) -> AbstractContactRepository:
+    return SQLAlchemyContactRepository(session=session)
 
 
-def get_contact_service() -> ContactService:
-    return _contacts_service
+def get_contact_service(
+    repository: AbstractContactRepository = Depends(get_contact_repository),
+) -> ContactService:
+    return ContactService(repository=repository)
 
 
 @router.get("", response_model=PaginatedContacts)
