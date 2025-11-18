@@ -132,6 +132,50 @@ async def test_create_task_creates_activity(
 
 
 @pytest.mark.asyncio
+async def test_create_task_with_past_due_date_fails(
+    api_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await seed_user_and_org(db_session)
+    await seed_organization_member(db_session, user_id=1, organization_id=1)
+    await seed_contact(db_session, organization_id=1, owner_id=1)
+    deal = await seed_deal(db_session, organization_id=1, contact_id=1, owner_id=1)
+
+    payload = {
+        "deal_id": deal.id,
+        "title": "Past due task",
+        "description": "Should fail",
+        "due_date": (datetime.now(tz=UTC) - timedelta(days=1)).isoformat().replace("+00:00", "Z"),
+    }
+
+    response = await api_client.post("/api/v1/tasks", json=payload, headers=HEADERS)
+    assert response.status_code == 400
+    assert response.json()["detail"] == "due_date cannot be in the past"
+
+
+@pytest.mark.asyncio
+async def test_create_task_with_today_due_date_succeeds(
+    api_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await seed_user_and_org(db_session)
+    await seed_organization_member(db_session, user_id=1, organization_id=1)
+    await seed_contact(db_session, organization_id=1, owner_id=1)
+    deal = await seed_deal(db_session, organization_id=1, contact_id=1, owner_id=1)
+
+    today = datetime.now(tz=UTC).replace(hour=0, minute=0, second=0, microsecond=0)
+    payload = {
+        "deal_id": deal.id,
+        "title": "Today due task",
+        "description": "Should pass",
+        "due_date": today.isoformat().replace("+00:00", "Z"),
+    }
+
+    response = await api_client.post("/api/v1/tasks", json=payload, headers=HEADERS)
+    assert response.status_code == 201
+    data = response.json()
+    assert data["title"] == "Today due task"
+
+
+@pytest.mark.asyncio
 async def test_member_cannot_create_task_for_foreign_deal(
     api_client: AsyncClient, db_session: AsyncSession
 ) -> None:

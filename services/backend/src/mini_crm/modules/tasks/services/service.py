@@ -44,10 +44,17 @@ class TaskService:
         )
 
     async def create_task(self, context: RequestContext, payload: TaskCreate) -> TaskResponse:
-        if payload.due_date and payload.due_date < datetime.now(tz=UTC):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="due_date cannot be in the past"
+        if payload.due_date:
+            due_date = payload.due_date
+            due_date_date = (
+                due_date.astimezone(UTC).date() if due_date.tzinfo is not None else due_date.date()
             )
+            today = datetime.now(tz=UTC).date()
+            if due_date_date < today:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="due_date cannot be in the past",
+                )
 
         if self.deal_repository is None:
             raise HTTPException(
