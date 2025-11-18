@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from datetime import UTC, datetime
 from decimal import Decimal
 
 from mini_crm.modules.deals.dto.schemas import DealCreate, DealResponse, DealUpdate
@@ -97,6 +98,7 @@ class InMemoryDealRepository(AbstractDealRepository):
         self, organization_id: int, owner_id: int, payload: DealCreate
     ) -> DealResponse:  # noqa: ARG002
         self._counter += 1
+        now = datetime.now(tz=UTC)
         deal = DealResponse(
             id=self._counter,
             organization_id=organization_id,
@@ -107,6 +109,8 @@ class InMemoryDealRepository(AbstractDealRepository):
             currency=payload.currency,
             status=DealStatus.NEW,
             stage=DealStage.QUALIFICATION,
+            created_at=now,
+            updated_at=now,
         )
         self._items[self._counter] = deal
         self._organization_ids[self._counter] = organization_id
@@ -114,7 +118,9 @@ class InMemoryDealRepository(AbstractDealRepository):
 
     async def update(self, organization_id: int, deal_id: int, payload: DealUpdate) -> DealResponse:  # noqa: ARG002
         deal = self._items[deal_id]
-        updated = deal.model_copy(update=payload.model_dump(exclude_none=True))
+        update_data = payload.model_dump(exclude_none=True)
+        update_data["updated_at"] = datetime.now(tz=UTC)
+        updated = deal.model_copy(update=update_data)
         self._items[deal_id] = updated
         return updated
 
