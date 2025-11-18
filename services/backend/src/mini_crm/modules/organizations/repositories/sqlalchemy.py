@@ -4,6 +4,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mini_crm.modules.auth.models import OrganizationMember
+from mini_crm.modules.organizations.dto.schemas import OrganizationDTO
+from mini_crm.modules.organizations.models import Organization
 from mini_crm.modules.organizations.repositories.repository import AbstractOrganizationRepository
 
 
@@ -11,8 +13,16 @@ class SQLAlchemyOrganizationRepository(AbstractOrganizationRepository):
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def list_for_user(self, user_id: int) -> list:
-        raise NotImplementedError("Use SQLAlchemy implementation for list_for_user")
+    async def list_for_user(self, user_id: int) -> list[OrganizationDTO]:
+        stmt = (
+            select(Organization)
+            .join(OrganizationMember, Organization.id == OrganizationMember.organization_id)
+            .where(OrganizationMember.user_id == user_id)
+            .distinct()
+        )
+        result = await self.session.scalars(stmt)
+        organizations = result.all()
+        return [OrganizationDTO(id=org.id, name=org.name) for org in organizations]
 
     async def get_membership(self, user_id: int, organization_id: int) -> OrganizationMember | None:
         stmt = select(OrganizationMember).where(
