@@ -17,8 +17,8 @@ class Settings(BaseSettings):
     )
     redis_url: str = Field(default="redis://redis:6379/0", alias="REDIS_URL")
 
-    jwt_secret_key: str = Field(default="changeme", alias="JWT_SECRET_KEY")
-    jwt_refresh_secret_key: str = Field(default="changeme-refresh", alias="JWT_REFRESH_SECRET_KEY")
+    jwt_secret_key: str = Field(alias="JWT_SECRET_KEY")
+    jwt_refresh_secret_key: str = Field(alias="JWT_REFRESH_SECRET_KEY")
     jwt_algorithm: str = Field(default="HS256", alias="JWT_ALGORITHM")
     access_token_expire_minutes: int = Field(default=15, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
     refresh_token_expire_minutes: int = Field(
