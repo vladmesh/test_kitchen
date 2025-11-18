@@ -6,6 +6,8 @@ from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mini_crm.core.db import get_session
+from mini_crm.core.security import InvalidTokenError, decode_access_token
+from mini_crm.modules.auth.repositories.sqlalchemy import SQLAlchemyAuthRepository
 from mini_crm.modules.common.context import OrganizationContext, RequestContext, RequestUser
 from mini_crm.modules.organizations.repositories.sqlalchemy import (
     SQLAlchemyOrganizationRepository,
@@ -25,16 +27,45 @@ async def get_db_session() -> AsyncIterator[AsyncSession]:
 
 async def get_request_user(
     authorization: str | None = Header(default=None, alias="Authorization"),
+    session: AsyncSession = Depends(get_db_session),
 ) -> RequestUser:
-    """Mock current user extraction for the scaffold."""
-
     if authorization is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing Authorization header"
         )
 
-    # TODO: validate JWT once the auth module is fully implemented.
-    return RequestUser(id=1, email="owner@example.com", role=UserRole.OWNER)
+    scheme, _, token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Authorization header"
+        )
+
+    try:
+        payload = decode_access_token(token)
+    except InvalidTokenError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid or expired access token"
+        ) from exc
+
+    subject = payload.get("sub")
+    if subject is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token payload"
+        )
+
+    try:
+        user_id = int(subject)
+    except (TypeError, ValueError) as exc:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token subject"
+        ) from exc
+
+    repository = SQLAlchemyAuthRepository(session)
+    auth_user = await repository.get_by_id(user_id)
+    if auth_user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+
+    return RequestUser(id=auth_user.id, email=auth_user.email, role=UserRole.OWNER)
 
 
 async def get_request_context(

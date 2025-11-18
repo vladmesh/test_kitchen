@@ -6,6 +6,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from mini_crm.core.security import create_access_token
 from mini_crm.modules.auth.models import OrganizationMember, User
 from mini_crm.modules.organizations.models import Organization
 from mini_crm.modules.organizations.repositories.sqlalchemy import (
@@ -13,7 +14,10 @@ from mini_crm.modules.organizations.repositories.sqlalchemy import (
 )
 from mini_crm.shared.enums import UserRole
 
-HEADERS = {"Authorization": "Bearer test", "X-Organization-Id": "1"}
+HEADERS = {
+    "Authorization": f"Bearer {create_access_token(1)}",
+    "X-Organization-Id": "1",
+}
 
 
 async def seed_user_and_org(session: AsyncSession) -> tuple[User, Organization]:
@@ -132,7 +136,10 @@ async def test_get_request_context_forbidden_wrong_organization(
 
     await seed_organization_member(db_session, user.id, org1.id, UserRole.OWNER)
 
-    wrong_headers = {"Authorization": "Bearer test", "X-Organization-Id": "2"}
+    wrong_headers = {
+        "Authorization": f"Bearer {create_access_token(user.id)}",
+        "X-Organization-Id": "2",
+    }
     response = await api_client.get("/api/v1/system/context", headers=wrong_headers)
     assert response.status_code == 403
     assert "not a member of this organization" in response.json()["detail"]

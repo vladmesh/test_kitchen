@@ -6,6 +6,7 @@ import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from mini_crm.core.security import create_access_token
 from mini_crm.modules.auth.models import OrganizationMember, User
 from mini_crm.modules.contacts.models import Contact
 from mini_crm.modules.deals.models import Deal
@@ -13,7 +14,10 @@ from mini_crm.modules.organizations.models import Organization
 from mini_crm.modules.tasks.models import Task
 from mini_crm.shared.enums import ActivityType, DealStage, DealStatus, UserRole
 
-HEADERS = {"Authorization": "Bearer test", "X-Organization-Id": "1"}
+HEADERS = {
+    "Authorization": f"Bearer {create_access_token(1)}",
+    "X-Organization-Id": "1",
+}
 
 
 async def seed_user_and_org(session: AsyncSession) -> None:

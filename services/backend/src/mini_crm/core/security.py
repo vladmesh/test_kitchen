@@ -4,9 +4,13 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import bcrypt
-from jose import jwt
+from jose import JWTError, jwt
 
 from mini_crm.config.settings import get_settings
+
+
+class InvalidTokenError(Exception):
+    """Raised when JWT validation fails."""
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -44,3 +48,17 @@ def create_refresh_token(subject: str | Any) -> str:
         secret=settings.jwt_refresh_secret_key,
         algorithm=settings.jwt_algorithm,
     )
+
+
+def decode_access_token(token: str) -> dict[str, Any]:
+    """Decode and validate access token payload."""
+
+    settings = get_settings()
+    try:
+        return jwt.decode(
+            token,
+            settings.jwt_secret_key,
+            algorithms=[settings.jwt_algorithm],
+        )
+    except JWTError as exc:
+        raise InvalidTokenError("Invalid access token") from exc

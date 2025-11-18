@@ -22,6 +22,10 @@ class AbstractAuthRepository(ABC):
     async def get_by_email(self, email: str) -> AuthUser | None:
         raise NotImplementedError
 
+    @abstractmethod
+    async def get_by_id(self, user_id: int) -> AuthUser | None:
+        raise NotImplementedError
+
 
 class InMemoryAuthRepository(AbstractAuthRepository):
     def __init__(self) -> None:
@@ -38,3 +42,9 @@ class InMemoryAuthRepository(AbstractAuthRepository):
 
     async def get_by_email(self, email: str) -> AuthUser | None:
         return self._users.get(email)
+
+    async def get_by_id(self, user_id: int) -> AuthUser | None:
+        for user in self._users.values():
+            if user.id == user_id:
+                return user
+        return None
