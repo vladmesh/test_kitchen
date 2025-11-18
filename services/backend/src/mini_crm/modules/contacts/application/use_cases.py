@@ -4,10 +4,10 @@ from mini_crm.modules.common.application.context import RequestContext
 from mini_crm.modules.common.domain.services import PermissionService
 from mini_crm.modules.contacts.application.dto import ContactListDTO
 from mini_crm.modules.contacts.domain.exceptions import ContactNotFoundError
+from mini_crm.modules.contacts.domain.ports import AbstractDealChecker
 from mini_crm.modules.contacts.domain.services import ContactDomainService
 from mini_crm.modules.contacts.dto.schemas import ContactCreate, ContactResponse
 from mini_crm.modules.contacts.repositories.repository import AbstractContactRepository
-from mini_crm.modules.deals.repositories.repository import AbstractDealRepository
 
 
 class ListContactsUseCase:
@@ -61,10 +61,10 @@ class DeleteContactUseCase:
     def __init__(
         self,
         repository: AbstractContactRepository,
-        deal_repository: AbstractDealRepository | None = None,
+        deal_checker: AbstractDealChecker | None = None,
     ) -> None:
         self.repository = repository
-        self.deal_repository = deal_repository
+        self.deal_checker = deal_checker
 
     async def execute(self, context: RequestContext, contact_id: int) -> None:
         """Delete a contact with business rule validation."""
@@ -81,8 +81,8 @@ class DeleteContactUseCase:
             raise PermissionDeniedError("You can only delete your own contacts")
 
         # Check business rules: cannot delete if has deals
-        if self.deal_repository:
-            has_deals = await self.deal_repository.has_deals_for_contact(contact_id)
+        if self.deal_checker:
+            has_deals = await self.deal_checker.has_deals_for_contact(contact_id)
             ContactDomainService.validate_deletion(has_deals, contact_id)
 
         await self.repository.delete(context.organization.organization_id, contact_id)

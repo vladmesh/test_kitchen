@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from mini_crm.core.dependencies import get_db_session, get_request_context
 from mini_crm.modules.common.application.context import RequestContext
 from mini_crm.modules.common.domain.exceptions import PermissionDeniedError
+from mini_crm.modules.contacts.application.adapters import DealRepositoryAdapter
 from mini_crm.modules.contacts.application.use_cases import (
     CreateContactUseCase,
     DeleteContactUseCase,
@@ -15,6 +16,7 @@ from mini_crm.modules.contacts.domain.exceptions import (
     ContactHasActiveDealsError,
     ContactNotFoundError,
 )
+from mini_crm.modules.contacts.domain.ports import AbstractDealChecker
 from mini_crm.modules.contacts.dto.schemas import ContactCreate, ContactResponse, PaginatedContacts
 from mini_crm.modules.contacts.repositories.repository import AbstractContactRepository
 from mini_crm.modules.contacts.repositories.sqlalchemy import SQLAlchemyContactRepository
@@ -30,10 +32,18 @@ def get_contact_repository(
     return SQLAlchemyContactRepository(session=session)
 
 
-def get_deal_repository(
+def get_deal_repository_for_checker(
     session: AsyncSession = Depends(get_db_session),
 ) -> AbstractDealRepository:
+    """Create deal repository instance for use in deal checker adapter."""
     return SQLAlchemyDealRepository(session=session)
+
+
+def get_deal_checker(
+    deal_repository: AbstractDealRepository = Depends(get_deal_repository_for_checker),
+) -> AbstractDealChecker:
+    """Create deal checker adapter that wraps deal repository."""
+    return DealRepositoryAdapter(deal_repository=deal_repository)
 
 
 def get_list_contacts_use_case(
@@ -50,9 +60,9 @@ def get_create_contact_use_case(
 
 def get_delete_contact_use_case(
     repository: AbstractContactRepository = Depends(get_contact_repository),
-    deal_repository: AbstractDealRepository = Depends(get_deal_repository),
+    deal_checker: AbstractDealChecker = Depends(get_deal_checker),
 ) -> DeleteContactUseCase:
-    return DeleteContactUseCase(repository=repository, deal_repository=deal_repository)
+    return DeleteContactUseCase(repository=repository, deal_checker=deal_checker)
 
 
 @router.get("", response_model=PaginatedContacts)

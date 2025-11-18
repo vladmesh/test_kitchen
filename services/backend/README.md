@@ -23,15 +23,8 @@ services/backend
 ## Workflow (Docker-only)
 
 - `make up` / `make down` – поднять/остановить dev-стек (backend + postgres + redis).
-- `make shell` – внутри контейнера backend.
 - `make tests` – тестовый стек через `infra/docker-compose.test.yml`.
 - `make lint`, `make format` – линтеры/типизация (ruff + mypy) и формат в `infra/Dockerfile.tools`.
 - `make migrate`, `make makemigration name=msg` – работа с Alembic.
 
 Все команды запускаются внутри контейнеров; локальные `poetry install`, `pytest`, `ruff` и т.п. не используются.
-
-## Next steps
-
-- Implement actual repositories/services inside each module.
-- Flesh out migrations with the schema from `TZ.md`.
-- Expand tests to cover multi-tenant and role-specific behaviour.
