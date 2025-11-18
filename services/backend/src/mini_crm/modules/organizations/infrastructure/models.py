@@ -10,7 +10,6 @@ from mini_crm.core.db import Base
 
 if TYPE_CHECKING:
     from mini_crm.modules.auth.infrastructure.models import OrganizationMember
-    from mini_crm.modules.tags.models import Tag  # Will be migrated later
 
 
 class Organization(Base):
@@ -22,7 +21,4 @@ class Organization(Base):
 
     members: Mapped[list[OrganizationMember]] = relationship(
         "OrganizationMember", back_populates="organization"
-    )
-    tags: Mapped[list[Tag]] = relationship(
-        "Tag", back_populates="organization", cascade="all,delete-orphan"
     )

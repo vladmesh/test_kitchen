@@ -21,7 +21,6 @@ from mini_crm.modules.auth import models as auth_models  # noqa: F401
 from mini_crm.modules.contacts import models as contacts_models  # noqa: F401
 from mini_crm.modules.deals import models as deals_models  # noqa: F401
 from mini_crm.modules.organizations import models as organizations_models  # noqa: F401
-from mini_crm.modules.tags import models as tags_models  # noqa: F401
 from mini_crm.modules.tasks import models as tasks_models  # noqa: F401
 
 
