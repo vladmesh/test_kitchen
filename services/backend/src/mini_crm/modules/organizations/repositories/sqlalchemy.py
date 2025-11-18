@@ -7,6 +7,7 @@ from mini_crm.modules.auth.infrastructure.models import OrganizationMember
 from mini_crm.modules.organizations.dto.schemas import OrganizationDTO
 from mini_crm.modules.organizations.infrastructure.models import Organization
 from mini_crm.modules.organizations.repositories.repository import AbstractOrganizationRepository
+from mini_crm.shared.domain.enums import UserRole
 
 
 class SQLAlchemyOrganizationRepository(AbstractOrganizationRepository):
@@ -31,3 +32,15 @@ class SQLAlchemyOrganizationRepository(AbstractOrganizationRepository):
         )
         result = await self.session.scalar(stmt)
         return result
+
+    async def add_member(
+        self, organization_id: int, user_id: int, role: UserRole
+    ) -> OrganizationMember:
+        member = OrganizationMember(
+            organization_id=organization_id,
+            user_id=user_id,
+            role=role,
+        )
+        self.session.add(member)
+        await self.session.flush()
+        return member
