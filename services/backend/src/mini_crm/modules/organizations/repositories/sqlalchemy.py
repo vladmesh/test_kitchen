@@ -3,9 +3,9 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from mini_crm.modules.auth.models import OrganizationMember
+from mini_crm.modules.auth.infrastructure.models import OrganizationMember
 from mini_crm.modules.organizations.dto.schemas import OrganizationDTO
-from mini_crm.modules.organizations.models import Organization
+from mini_crm.modules.organizations.infrastructure.models import Organization
 from mini_crm.modules.organizations.repositories.repository import AbstractOrganizationRepository
 
 

@@ -3,10 +3,10 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from mini_crm.modules.auth.models import OrganizationMember, User
+from mini_crm.modules.auth.infrastructure.models import OrganizationMember, User
 from mini_crm.modules.auth.repositories.repository import AbstractAuthRepository, AuthUser
-from mini_crm.modules.organizations.models import Organization
-from mini_crm.shared.enums import UserRole
+from mini_crm.modules.organizations.infrastructure.models import Organization
+from mini_crm.shared.domain.enums import UserRole
 
 
 class SQLAlchemyAuthRepository(AbstractAuthRepository):

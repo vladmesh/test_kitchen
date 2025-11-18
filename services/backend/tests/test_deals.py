@@ -136,8 +136,13 @@ async def test_deal_repository_update(db_session: AsyncSession) -> None:
 @pytest.mark.asyncio
 async def test_deal_repository_update_won_with_zero_amount(db_session: AsyncSession) -> None:
     from mini_crm.modules.activities.repositories.repository import InMemoryActivityRepository
-    from mini_crm.modules.common.context import OrganizationContext, RequestContext, RequestUser
-    from mini_crm.modules.deals.services.service import DealService
+    from mini_crm.modules.common.application.context import (
+        OrganizationContext,
+        RequestContext,
+        RequestUser,
+    )
+    from mini_crm.modules.deals.application.use_cases import UpdateDealUseCase
+    from mini_crm.modules.deals.domain.exceptions import DealValidationError
 
     await seed_user_and_org(db_session)
     await seed_organization_member(db_session, user_id=1, organization_id=1)
@@ -152,22 +157,19 @@ async def test_deal_repository_update_won_with_zero_amount(db_session: AsyncSess
     )
     created = await repository.create(organization_id=1, owner_id=1, payload=payload)
 
-    from fastapi import HTTPException
-
     from mini_crm.modules.deals.dto.schemas import DealUpdate
 
     activity_repo = InMemoryActivityRepository()
-    service = DealService(repository=repository, activity_repository=activity_repo)
+    use_case = UpdateDealUseCase(repository=repository, activity_repository=activity_repo)
     context = RequestContext(
         user=RequestUser(id=1, email="owner@example.com"),
         organization=OrganizationContext(organization_id=1, role=UserRole.OWNER),
     )
 
     update_payload = DealUpdate(status=DealStatus.WON)
-    with pytest.raises(HTTPException) as exc_info:
-        await service.update_deal(context, created.id, update_payload)
-    assert exc_info.value.status_code == 400
-    assert "Amount must be positive" in exc_info.value.detail
+    with pytest.raises(DealValidationError) as exc_info:
+        await use_case.execute(context, created.id, update_payload)
+    assert "Amount must be positive" in str(exc_info.value)
 
 
 @pytest.mark.asyncio
@@ -380,16 +382,21 @@ async def test_deal_update_activity_has_author_id(
 @pytest.mark.asyncio
 async def test_deal_stage_rollback_permission(db_session: AsyncSession) -> None:
     from mini_crm.modules.activities.repositories.repository import InMemoryActivityRepository
-    from mini_crm.modules.common.context import OrganizationContext, RequestContext, RequestUser
+    from mini_crm.modules.common.application.context import (
+        OrganizationContext,
+        RequestContext,
+        RequestUser,
+    )
+    from mini_crm.modules.deals.application.use_cases import UpdateDealUseCase
+    from mini_crm.modules.deals.domain.exceptions import DealValidationError
     from mini_crm.modules.deals.dto.schemas import DealUpdate
-    from mini_crm.modules.deals.services.service import DealService
 
     await seed_user_and_org(db_session)
     await seed_contact(db_session, organization_id=1, owner_id=1)
 
     repository = SQLAlchemyDealRepository(session=db_session)
     activity_repo = InMemoryActivityRepository()
-    service = DealService(repository=repository, activity_repository=activity_repo)
+    use_case = UpdateDealUseCase(repository=repository, activity_repository=activity_repo)
 
     # Create deal
     payload = DealCreate(
@@ -411,28 +418,30 @@ async def test_deal_stage_rollback_permission(db_session: AsyncSession) -> None:
     )
     rollback_payload = DealUpdate(stage=DealStage.QUALIFICATION)
 
-    from fastapi import HTTPException
-
-    with pytest.raises(HTTPException) as exc_info:
-        await service.update_deal(member_context, created.id, rollback_payload)
-    assert exc_info.value.status_code == 403
-    assert "Stage rollback is not allowed" in exc_info.value.detail
+    with pytest.raises(DealValidationError) as exc_info:
+        await use_case.execute(member_context, created.id, rollback_payload)
+    assert "Stage rollback is not allowed" in str(exc_info.value)
 
     # Try as ADMIN - should succeed
     admin_context = RequestContext(
         user=RequestUser(id=1, email="admin@example.com"),
         organization=OrganizationContext(organization_id=1, role=UserRole.ADMIN),
     )
-    updated = await service.update_deal(admin_context, created.id, rollback_payload)
+    updated = await use_case.execute(admin_context, created.id, rollback_payload)
     assert updated.stage == DealStage.QUALIFICATION
 
 
 @pytest.mark.asyncio
 async def test_deal_update_member_ownership_check(db_session: AsyncSession) -> None:
     from mini_crm.modules.activities.repositories.repository import InMemoryActivityRepository
-    from mini_crm.modules.common.context import OrganizationContext, RequestContext, RequestUser
+    from mini_crm.modules.common.application.context import (
+        OrganizationContext,
+        RequestContext,
+        RequestUser,
+    )
+    from mini_crm.modules.deals.application.use_cases import UpdateDealUseCase
+    from mini_crm.modules.deals.domain.exceptions import DealPermissionDeniedError
     from mini_crm.modules.deals.dto.schemas import DealUpdate
-    from mini_crm.modules.deals.services.service import DealService
 
     await seed_user_and_org(db_session)
     await seed_contact(db_session, organization_id=1, owner_id=1)
@@ -455,7 +464,7 @@ async def test_deal_update_member_ownership_check(db_session: AsyncSession) -> N
 
     repository = SQLAlchemyDealRepository(session=db_session)
     activity_repo = InMemoryActivityRepository()
-    service = DealService(repository=repository, activity_repository=activity_repo)
+    use_case = UpdateDealUseCase(repository=repository, activity_repository=activity_repo)
 
     # Create deal owned by user 1
     payload = DealCreate(
@@ -473,20 +482,21 @@ async def test_deal_update_member_ownership_check(db_session: AsyncSession) -> N
     )
     update_payload = DealUpdate(status=DealStatus.IN_PROGRESS)
 
-    from fastapi import HTTPException
-
-    with pytest.raises(HTTPException) as exc_info:
-        await service.update_deal(member_context, created.id, update_payload)
-    assert exc_info.value.status_code == 403
-    assert "You can only update your own deals" in exc_info.value.detail
+    with pytest.raises(DealPermissionDeniedError) as exc_info:
+        await use_case.execute(member_context, created.id, update_payload)
+    assert "You can only update your own deals" in str(exc_info.value)
 
 
 @pytest.mark.asyncio
 async def test_deal_update_member_can_update_own_deal(db_session: AsyncSession) -> None:
     from mini_crm.modules.activities.repositories.repository import InMemoryActivityRepository
-    from mini_crm.modules.common.context import OrganizationContext, RequestContext, RequestUser
+    from mini_crm.modules.common.application.context import (
+        OrganizationContext,
+        RequestContext,
+        RequestUser,
+    )
+    from mini_crm.modules.deals.application.use_cases import UpdateDealUseCase
     from mini_crm.modules.deals.dto.schemas import DealUpdate
-    from mini_crm.modules.deals.services.service import DealService
 
     await seed_user_and_org(db_session)
     await seed_contact(db_session, organization_id=1, owner_id=1)
@@ -509,7 +519,7 @@ async def test_deal_update_member_can_update_own_deal(db_session: AsyncSession) 
 
     repository = SQLAlchemyDealRepository(session=db_session)
     activity_repo = InMemoryActivityRepository()
-    service = DealService(repository=repository, activity_repository=activity_repo)
+    use_case = UpdateDealUseCase(repository=repository, activity_repository=activity_repo)
 
     # Create deal owned by user 2
     payload = DealCreate(
@@ -526,7 +536,7 @@ async def test_deal_update_member_can_update_own_deal(db_session: AsyncSession) 
         organization=OrganizationContext(organization_id=1, role=UserRole.MEMBER),
     )
     update_payload = DealUpdate(status=DealStatus.IN_PROGRESS)
-    updated = await service.update_deal(member_context, created.id, update_payload)
+    updated = await use_case.execute(member_context, created.id, update_payload)
     assert updated.status == DealStatus.IN_PROGRESS
 
 

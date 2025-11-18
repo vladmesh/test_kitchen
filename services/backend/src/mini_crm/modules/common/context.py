@@ -1,23 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+# Re-export from application layer for backward compatibility
+from mini_crm.modules.common.application.context import (
+    OrganizationContext,
+    RequestContext,
+    RequestUser,
+)
 
-from mini_crm.shared.enums import UserRole
-
-
-@dataclass
-class RequestUser:
-    id: int
-    email: str
-
-
-@dataclass
-class OrganizationContext:
-    organization_id: int
-    role: UserRole
-
-
-@dataclass
-class RequestContext:
-    user: RequestUser
-    organization: OrganizationContext
+__all__ = ["RequestUser", "OrganizationContext", "RequestContext"]

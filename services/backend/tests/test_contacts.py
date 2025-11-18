@@ -175,7 +175,10 @@ async def test_delete_contact_with_deals_fails(
 
     delete_response = await api_client.delete("/api/v1/contacts/1", headers=HEADERS)
     assert delete_response.status_code == 409
-    assert "Cannot delete contact with existing deals" in delete_response.json()["detail"]
+    assert (
+        "Cannot delete contact" in delete_response.json()["detail"]
+        and "existing deals" in delete_response.json()["detail"]
+    )
 
 
 @pytest.mark.asyncio

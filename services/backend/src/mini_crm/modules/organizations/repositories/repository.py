@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 from mini_crm.modules.organizations.dto.schemas import OrganizationDTO
 
 if TYPE_CHECKING:
-    from mini_crm.modules.auth.models import OrganizationMember
+    from mini_crm.modules.auth.infrastructure.models import OrganizationMember
 
 
 class AbstractOrganizationRepository(ABC):

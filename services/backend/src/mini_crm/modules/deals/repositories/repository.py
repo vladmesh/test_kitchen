@@ -39,6 +39,11 @@ class AbstractDealRepository(ABC):
     async def get_by_id(self, organization_id: int, deal_id: int) -> DealResponse | None:
         raise NotImplementedError
 
+    @abstractmethod
+    async def has_deals_for_contact(self, contact_id: int) -> bool:
+        """Check if contact has any deals."""
+        raise NotImplementedError
+
 
 class InMemoryDealRepository(AbstractDealRepository):
     def __init__(self) -> None:
@@ -120,3 +125,7 @@ class InMemoryDealRepository(AbstractDealRepository):
         if self._organization_ids.get(deal_id) != organization_id:
             return None
         return deal
+
+    async def has_deals_for_contact(self, contact_id: int) -> bool:  # noqa: ARG002
+        """Check if contact has any deals."""
+        return any(deal.contact_id == contact_id for deal in self._items.values())

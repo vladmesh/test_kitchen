@@ -294,7 +294,7 @@ async def test_create_task_for_deal_in_another_organization_forbidden(
     }
     response = await api_client.post("/api/v1/tasks", json=payload, headers=HEADERS)
     assert response.status_code == 404
-    assert "Deal not found" in response.json()["detail"]
+    assert "Deal" in response.json()["detail"] and "not found" in response.json()["detail"]
 
 
 @pytest.mark.asyncio

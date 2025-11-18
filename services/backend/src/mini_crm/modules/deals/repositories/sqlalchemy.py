@@ -155,3 +155,9 @@ class SQLAlchemyDealRepository(AbstractDealRepository):
         if result is None:
             return None
         return DealResponse.model_validate(result)
+
+    async def has_deals_for_contact(self, contact_id: int) -> bool:
+        """Check if contact has any deals."""
+        stmt = select(func.count()).select_from(Deal).where(Deal.contact_id == contact_id)
+        count = await self.session.scalar(stmt)
+        return bool(count and count > 0)
