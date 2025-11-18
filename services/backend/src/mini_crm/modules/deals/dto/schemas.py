@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from decimal import Decimal
 
 from mini_crm.shared.dto.base import DTO
@@ -30,6 +31,8 @@ class DealResponse(DTO):
     currency: str
     status: DealStatus
     stage: DealStage
+    created_at: datetime
+    updated_at: datetime
 
 
 class PaginatedDeals(DTO):
