@@ -9,6 +9,7 @@ from mini_crm.core.dependencies import get_db_session, get_request_context
 from mini_crm.modules.activities.repositories.repository import AbstractActivityRepository
 from mini_crm.modules.activities.repositories.sqlalchemy import SQLAlchemyActivityRepository
 from mini_crm.modules.common.application.context import RequestContext
+from mini_crm.modules.contacts.domain.exceptions import ContactNotFoundError
 from mini_crm.modules.deals.application.use_cases import (
     CreateDealUseCase,
     ListDealsUseCase,
@@ -106,7 +107,10 @@ async def create_deal(
     context: RequestContext = Depends(get_request_context),
     use_case: CreateDealUseCase = Depends(get_create_deal_use_case),
 ) -> DealResponse:
-    return await use_case.execute(context, payload)
+    try:
+        return await use_case.execute(context, payload)
+    except ContactNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
 
 
 @router.patch("/{deal_id}", response_model=DealResponse)

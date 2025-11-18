@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from fastapi import HTTPException, status
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from mini_crm.modules.contacts.domain.exceptions import (
+    ContactHasActiveDealsError,
+    ContactNotFoundError,
+)
 from mini_crm.modules.contacts.dto.schemas import ContactCreate, ContactResponse
 from mini_crm.modules.contacts.models import Contact
 from mini_crm.modules.contacts.repositories.repository import AbstractContactRepository
@@ -88,19 +91,13 @@ class SQLAlchemyContactRepository(AbstractContactRepository):
         )
         contact = await self.session.scalar(contact_stmt)
         if contact is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Contact not found",
-            )
+            raise ContactNotFoundError(contact_id)
 
         # Check if contact has any deals
         deals_stmt = select(func.count()).select_from(Deal).where(Deal.contact_id == contact_id)
         deals_count = await self.session.scalar(deals_stmt)
         if deals_count and deals_count > 0:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Cannot delete contact with existing deals",
-            )
+            raise ContactHasActiveDealsError(contact_id)
 
         await self.session.delete(contact)
         await self.session.flush()

@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from mini_crm.modules.deals.domain.exceptions import DealNotFoundError
 from mini_crm.modules.deals.models import Deal
 from mini_crm.modules.tasks.dto.schemas import TaskCreate, TaskResponse
 from mini_crm.modules.tasks.models import Task
@@ -54,10 +54,7 @@ class SQLAlchemyTaskRepository(AbstractTaskRepository):
         )
         deal = await self.session.scalar(deal_stmt)
         if deal is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Deal not found or does not belong to organization",
-            )
+            raise DealNotFoundError(payload.deal_id)
 
         task = Task(
             deal_id=payload.deal_id,

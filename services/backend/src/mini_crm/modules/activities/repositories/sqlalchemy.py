@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mini_crm.modules.activities.dto.schemas import ActivityCreate, ActivityResponse
 from mini_crm.modules.activities.models import Activity
 from mini_crm.modules.activities.repositories.repository import AbstractActivityRepository
+from mini_crm.modules.deals.domain.exceptions import DealNotFoundError
 from mini_crm.modules.deals.models import Deal
 
 
@@ -44,10 +44,7 @@ class SQLAlchemyActivityRepository(AbstractActivityRepository):
         )
         deal = await self.session.scalar(deal_stmt)
         if deal is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Deal not found",
-            )
+            raise DealNotFoundError(deal_id)
 
         activity = Activity(
             deal_id=deal_id,

@@ -103,11 +103,11 @@ async def test_deal_repository_contact_validation(db_session: AsyncSession) -> N
         currency="USD",
     )
 
-    from fastapi import HTTPException
+    from mini_crm.modules.contacts.domain.exceptions import ContactNotFoundError
 
-    with pytest.raises(HTTPException) as exc_info:
+    with pytest.raises(ContactNotFoundError) as exc_info:
         await repository.create(organization_id=1, owner_id=1, payload=payload)
-    assert exc_info.value.status_code == 404
+    assert exc_info.value.contact_id == 999
 
 
 @pytest.mark.asyncio

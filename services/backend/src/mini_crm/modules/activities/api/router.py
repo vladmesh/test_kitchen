@@ -13,6 +13,7 @@ from mini_crm.modules.activities.dto.schemas import ActivityCreate, ActivityResp
 from mini_crm.modules.activities.repositories.repository import AbstractActivityRepository
 from mini_crm.modules.activities.repositories.sqlalchemy import SQLAlchemyActivityRepository
 from mini_crm.modules.common.application.context import RequestContext
+from mini_crm.modules.deals.domain.exceptions import DealNotFoundError
 
 router = APIRouter(prefix="/deals/{deal_id}/activities", tags=["activities"])
 
@@ -53,5 +54,7 @@ async def create_activity(
 ) -> ActivityResponse:
     try:
         return await use_case.execute(context, deal_id, payload)
+    except DealNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e)) from e
     except ActivityValidationError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e

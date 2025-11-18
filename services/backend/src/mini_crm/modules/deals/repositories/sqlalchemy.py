@@ -3,11 +3,12 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from decimal import Decimal
 
-from fastapi import HTTPException, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from mini_crm.modules.contacts.domain.exceptions import ContactNotFoundError
 from mini_crm.modules.contacts.models import Contact
+from mini_crm.modules.deals.domain.exceptions import DealNotFoundError
 from mini_crm.modules.deals.dto.schemas import DealCreate, DealResponse, DealUpdate
 from mini_crm.modules.deals.models import Deal
 from mini_crm.modules.deals.repositories.repository import AbstractDealRepository
@@ -102,10 +103,7 @@ class SQLAlchemyDealRepository(AbstractDealRepository):
         )
         contact = await self.session.scalar(contact_stmt)
         if contact is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Contact not found or does not belong to organization",
-            )
+            raise ContactNotFoundError(payload.contact_id)
 
         deal = Deal(
             organization_id=organization_id,
@@ -131,10 +129,7 @@ class SQLAlchemyDealRepository(AbstractDealRepository):
         )
         deal = await self.session.scalar(stmt)
         if deal is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Deal not found",
-            )
+            raise DealNotFoundError(deal_id)
 
         # Update fields
         update_data = payload.model_dump(exclude_none=True)
