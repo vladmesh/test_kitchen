@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from mini_crm.app.main import app
+from mini_crm.core.cache import RedisCache
 from mini_crm.core.db import Base
 from mini_crm.core.dependencies import get_db_session
 from mini_crm.modules.activities import models as activities_models  # noqa: F401
@@ -66,6 +67,14 @@ async def api_client(
             except Exception:
                 await session.rollback()
                 raise
+
+    # Clear cache before each test
+    cache = RedisCache.get_instance()
+    try:
+        await cache.delete("analytics:deals:summary:1")
+        await cache.delete("analytics:deals:funnel:1")
+    except Exception:
+        pass  # Ignore cache errors in tests
 
     app.dependency_overrides[get_db_session] = override_get_db_session
     transport = ASGITransport(app=app)
