@@ -12,6 +12,7 @@ from mini_crm.modules.auth.domain.exceptions import (
 from mini_crm.modules.auth.dto.schemas import LoginRequest, RegisterRequest, TokenPair
 from mini_crm.modules.auth.repositories.repository import AbstractAuthRepository
 from mini_crm.modules.auth.repositories.sqlalchemy import SQLAlchemyAuthRepository
+from mini_crm.modules.organizations.domain.exceptions import OrganizationAlreadyExistsError
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -47,6 +48,8 @@ async def register(
         )
         return TokenPair(access_token=result.access_token, refresh_token=result.refresh_token)
     except UserAlreadyExistsError as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
+    except OrganizationAlreadyExistsError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e)) from e
 
 

@@ -19,3 +19,12 @@ class MemberAlreadyExistsError(BusinessRuleViolationError):
         super().__init__(message)
         self.email = email
         self.organization_id = organization_id
+
+
+class OrganizationAlreadyExistsError(BusinessRuleViolationError):
+    """Raised when trying to create an organization with a name that already exists."""
+
+    def __init__(self, name: str) -> None:
+        message = f"Organization with name '{name}' already exists"
+        super().__init__(message)
+        self.name = name
