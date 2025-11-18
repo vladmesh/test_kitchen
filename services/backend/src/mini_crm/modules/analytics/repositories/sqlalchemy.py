@@ -112,14 +112,22 @@ class SQLAlchemyAnalyticsRepository(AbstractAnalyticsRepository):
         stages_data: list[StageStats] = []
         stage_counts: dict[str, dict[str, int]] = {}
 
-        for stage in stage_order:
-            # Count deals by status for this stage
+        # Calculate cumulative counts for each stage
+        # Each stage includes all deals that reached this stage or later stages
+        for i, stage in enumerate(stage_order):
+            # Get all stages from current stage onwards (cumulative)
+            stages_to_count = stage_order[i:]
+
+            # Count deals by status for cumulative stages
             count_stmt = select(
                 func.count(case((Deal.status == DealStatus.NEW, 1))).label("new"),
                 func.count(case((Deal.status == DealStatus.IN_PROGRESS, 1))).label("in_progress"),
                 func.count(case((Deal.status == DealStatus.WON, 1))).label("won"),
                 func.count(case((Deal.status == DealStatus.LOST, 1))).label("lost"),
-            ).where(Deal.organization_id == organization_id, Deal.stage == stage)
+            ).where(
+                Deal.organization_id == organization_id,
+                Deal.stage.in_([s.value for s in stages_to_count]),
+            )
 
             result = await self.session.execute(count_stmt)
             row = result.first()

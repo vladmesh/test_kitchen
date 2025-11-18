@@ -260,18 +260,23 @@ async def test_deals_funnel_with_real_data(db_session: AsyncSession) -> None:
 
     assert len(funnel.stages) == 4
 
+    # Cumulative funnel: each stage includes all deals that reached this stage or later
     qualification = next(s for s in funnel.stages if s.stage == "qualification")
-    assert qualification.total == 2
+    assert (
+        qualification.total == 5
+    )  # 2 in Qualification + 1 in Proposal + 1 in Negotiation + 1 in Closed
     assert qualification.by_status.new == 1
-    assert qualification.by_status.in_progress == 1
+    assert qualification.by_status.in_progress == 2  # 1 in Qualification + 1 in Proposal
+    assert qualification.by_status.won == 2  # 1 in Negotiation + 1 in Closed
 
     proposal = next(s for s in funnel.stages if s.stage == "proposal")
-    assert proposal.total == 1
+    assert proposal.total == 3  # 1 in Proposal + 1 in Negotiation + 1 in Closed
     assert proposal.by_status.in_progress == 1
+    assert proposal.by_status.won == 2  # 1 in Negotiation + 1 in Closed
 
     negotiation = next(s for s in funnel.stages if s.stage == "negotiation")
-    assert negotiation.total == 1
-    assert negotiation.by_status.won == 1
+    assert negotiation.total == 2  # 1 in Negotiation + 1 in Closed
+    assert negotiation.by_status.won == 2  # 1 in Negotiation + 1 in Closed
 
     closed = next(s for s in funnel.stages if s.stage == "closed")
     assert closed.total == 1
@@ -332,7 +337,13 @@ async def test_deals_funnel_conversion_rates(db_session: AsyncSession) -> None:
 
     assert len(funnel.conversion_rates) == 3
 
-    # Qualification to Proposal: 5/10 = 50%
+    # Cumulative funnel conversion rates:
+    # Qualification: 10 + 5 + 3 + 2 = 20 total
+    # Proposal: 5 + 3 + 2 = 10 total
+    # Negotiation: 3 + 2 = 5 total
+    # Closed: 2 total
+
+    # Qualification to Proposal: 10/20 = 50%
     qual_to_prop = next(
         cr
         for cr in funnel.conversion_rates
@@ -340,21 +351,21 @@ async def test_deals_funnel_conversion_rates(db_session: AsyncSession) -> None:
     )
     assert qual_to_prop.rate_percent == 50.0
 
-    # Proposal to Negotiation: 3/5 = 60%
+    # Proposal to Negotiation: 5/10 = 50%
     prop_to_neg = next(
         cr
         for cr in funnel.conversion_rates
         if cr.from_stage == "proposal" and cr.to_stage == "negotiation"
     )
-    assert prop_to_neg.rate_percent == 60.0
+    assert prop_to_neg.rate_percent == 50.0
 
-    # Negotiation to Closed: 2/3 = 66.67%
+    # Negotiation to Closed: 2/5 = 40%
     neg_to_closed = next(
         cr
         for cr in funnel.conversion_rates
         if cr.from_stage == "negotiation" and cr.to_stage == "closed"
     )
-    assert abs(neg_to_closed.rate_percent - 66.67) < 0.1
+    assert abs(neg_to_closed.rate_percent - 40.0) < 0.1
 
 
 @pytest.mark.asyncio
@@ -405,4 +416,6 @@ async def test_analytics_api_funnel(api_client: AsyncClient, db_session: AsyncSe
     assert len(data["conversion_rates"]) == 3
 
     qualification = next(s for s in data["stages"] if s["stage"] == "qualification")
-    assert qualification["total"] == 1
+    assert (
+        qualification["total"] == 1
+    )  # Cumulative: 1 in Qualification (and no deals in later stages)
