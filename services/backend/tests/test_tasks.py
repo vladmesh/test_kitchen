@@ -208,7 +208,7 @@ async def test_member_cannot_create_task_for_foreign_deal(
     deal = await seed_deal(db_session, organization_id=1, contact_id=1, owner_id=1)
 
     async def override_get_request_user() -> RequestUser:
-        return RequestUser(id=2, email="member@example.com", role=UserRole.MEMBER)
+        return RequestUser(id=2, email="member@example.com")
 
     async def override_get_request_context(
         user: RequestUser = Depends(override_get_request_user),

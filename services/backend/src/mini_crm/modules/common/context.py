@@ -9,7 +9,6 @@ from mini_crm.shared.enums import UserRole
 class RequestUser:
     id: int
     email: str
-    role: UserRole
 
 
 @dataclass

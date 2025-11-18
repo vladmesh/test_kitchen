@@ -65,7 +65,7 @@ async def get_request_user(
     if auth_user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
 
-    return RequestUser(id=auth_user.id, email=auth_user.email, role=UserRole.OWNER)
+    return RequestUser(id=auth_user.id, email=auth_user.email)
 
 
 async def get_request_context(

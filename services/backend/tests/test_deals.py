@@ -159,7 +159,7 @@ async def test_deal_repository_update_won_with_zero_amount(db_session: AsyncSess
     activity_repo = InMemoryActivityRepository()
     service = DealService(repository=repository, activity_repository=activity_repo)
     context = RequestContext(
-        user=RequestUser(id=1, email="owner@example.com", role=UserRole.OWNER),
+        user=RequestUser(id=1, email="owner@example.com"),
         organization=OrganizationContext(organization_id=1, role=UserRole.OWNER),
     )
 
@@ -406,7 +406,7 @@ async def test_deal_stage_rollback_permission(db_session: AsyncSession) -> None:
 
     # Try to rollback to QUALIFICATION as MEMBER - should fail
     member_context = RequestContext(
-        user=RequestUser(id=1, email="member@example.com", role=UserRole.MEMBER),
+        user=RequestUser(id=1, email="member@example.com"),
         organization=OrganizationContext(organization_id=1, role=UserRole.MEMBER),
     )
     rollback_payload = DealUpdate(stage=DealStage.QUALIFICATION)
@@ -420,7 +420,7 @@ async def test_deal_stage_rollback_permission(db_session: AsyncSession) -> None:
 
     # Try as ADMIN - should succeed
     admin_context = RequestContext(
-        user=RequestUser(id=1, email="admin@example.com", role=UserRole.ADMIN),
+        user=RequestUser(id=1, email="admin@example.com"),
         organization=OrganizationContext(organization_id=1, role=UserRole.ADMIN),
     )
     updated = await service.update_deal(admin_context, created.id, rollback_payload)
@@ -468,7 +468,7 @@ async def test_deal_update_member_ownership_check(db_session: AsyncSession) -> N
 
     # Try to update deal owned by user 1 as user 2 (member) - should fail
     member_context = RequestContext(
-        user=RequestUser(id=2, email="member@example.com", role=UserRole.MEMBER),
+        user=RequestUser(id=2, email="member@example.com"),
         organization=OrganizationContext(organization_id=1, role=UserRole.MEMBER),
     )
     update_payload = DealUpdate(status=DealStatus.IN_PROGRESS)
@@ -522,7 +522,7 @@ async def test_deal_update_member_can_update_own_deal(db_session: AsyncSession) 
 
     # Update deal owned by user 2 as user 2 (member) - should succeed
     member_context = RequestContext(
-        user=RequestUser(id=2, email="member@example.com", role=UserRole.MEMBER),
+        user=RequestUser(id=2, email="member@example.com"),
         organization=OrganizationContext(organization_id=1, role=UserRole.MEMBER),
     )
     update_payload = DealUpdate(status=DealStatus.IN_PROGRESS)

@@ -211,7 +211,7 @@ async def test_delete_contact_member_permission_check(
 
     # Override get_request_user to return user 2
     async def override_get_request_user() -> RequestUser:
-        return RequestUser(id=2, email="member@example.com", role=UserRole.MEMBER)
+        return RequestUser(id=2, email="member@example.com")
 
     from fastapi import Header
 
@@ -289,7 +289,7 @@ async def test_delete_contact_member_can_delete_own(
 
     # Override get_request_user to return user 2
     async def override_get_request_user() -> RequestUser:
-        return RequestUser(id=2, email="member@example.com", role=UserRole.MEMBER)
+        return RequestUser(id=2, email="member@example.com")
 
     from fastapi import Header
 
