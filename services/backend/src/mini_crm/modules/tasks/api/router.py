@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from mini_crm.core.dependencies import get_db_session, get_request_context
@@ -49,11 +51,20 @@ def get_task_service(
 
 @router.get("", response_model=list[TaskResponse])
 async def list_tasks(
-    deal_id: int,
+    deal_id: int | None = Query(default=None),
+    only_open: bool = Query(default=False),
+    due_before: datetime | None = Query(default=None),
+    due_after: datetime | None = Query(default=None),
     context: RequestContext = Depends(get_request_context),
     service: TaskService = Depends(get_task_service),
 ) -> list[TaskResponse]:
-    return await service.list_for_deal(context, deal_id)
+    return await service.list_tasks(
+        context,
+        deal_id=deal_id,
+        only_open=only_open,
+        due_before=due_before,
+        due_after=due_after,
+    )
 
 
 @router.post("", response_model=TaskResponse, status_code=201)

@@ -27,8 +27,21 @@ class TaskService:
         self.activity_repository = activity_repository
         self.deal_repository = deal_repository
 
-    async def list_for_deal(self, context: RequestContext, deal_id: int) -> list[TaskResponse]:
-        return await self.repository.list_for_deal(context.organization.organization_id, deal_id)
+    async def list_tasks(
+        self,
+        context: RequestContext,
+        deal_id: int | None = None,
+        only_open: bool = False,
+        due_before: datetime | None = None,
+        due_after: datetime | None = None,
+    ) -> list[TaskResponse]:
+        return await self.repository.list_tasks(
+            context.organization.organization_id,
+            deal_id=deal_id,
+            only_open=only_open,
+            due_before=due_before,
+            due_after=due_after,
+        )
 
     async def create_task(self, context: RequestContext, payload: TaskCreate) -> TaskResponse:
         if payload.due_date and payload.due_date < datetime.now(tz=UTC):

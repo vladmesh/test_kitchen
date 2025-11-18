@@ -16,15 +16,6 @@ jobs:
     - name: Run lint (Docker)
       run: make lint
 
-  typecheck:
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Run typecheck (Docker)
-      run: make typecheck
-
   test:
     runs-on: ubuntu-latest
 

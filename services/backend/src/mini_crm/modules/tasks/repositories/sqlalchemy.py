@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,17 +16,31 @@ class SQLAlchemyTaskRepository(AbstractTaskRepository):
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
-    async def list_for_deal(self, organization_id: int, deal_id: int) -> list[TaskResponse]:
-        # Join with Deal to ensure deal belongs to organization
+    async def list_tasks(
+        self,
+        organization_id: int,
+        deal_id: int | None = None,
+        only_open: bool = False,
+        due_before: datetime | None = None,
+        due_after: datetime | None = None,
+    ) -> list[TaskResponse]:
+        # Join with Deal to ensure tasks belong to organization
         stmt = (
             select(Task)
             .join(Deal, Task.deal_id == Deal.id)
-            .where(
-                Task.deal_id == deal_id,
-                Deal.organization_id == organization_id,
-            )
+            .where(Deal.organization_id == organization_id)
             .order_by(Task.created_at.desc())
         )
+
+        if deal_id is not None:
+            stmt = stmt.where(Task.deal_id == deal_id)
+        if only_open:
+            stmt = stmt.where(Task.is_done.is_(False))
+        if due_before is not None:
+            stmt = stmt.where(Task.due_date.is_not(None), Task.due_date <= due_before)
+        if due_after is not None:
+            stmt = stmt.where(Task.due_date.is_not(None), Task.due_date >= due_after)
+
         result = await self.session.scalars(stmt)
         tasks = result.all()
 

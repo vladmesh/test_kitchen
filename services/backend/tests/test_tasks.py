@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from httpx import AsyncClient
@@ -10,6 +10,7 @@ from mini_crm.modules.auth.models import OrganizationMember, User
 from mini_crm.modules.contacts.models import Contact
 from mini_crm.modules.deals.models import Deal
 from mini_crm.modules.organizations.models import Organization
+from mini_crm.modules.tasks.models import Task
 from mini_crm.shared.enums import ActivityType, DealStage, DealStatus, UserRole
 
 HEADERS = {"Authorization": "Bearer test", "X-Organization-Id": "1"}
@@ -246,3 +247,135 @@ async def test_create_task_for_deal_in_another_organization_forbidden(
     response = await api_client.post("/api/v1/tasks", json=payload, headers=HEADERS)
     assert response.status_code == 404
     assert "Deal not found" in response.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_list_tasks_filters_by_deal_and_only_open(
+    api_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await seed_user_and_org(db_session)
+    await seed_organization_member(db_session, user_id=1, organization_id=1, role=UserRole.OWNER)
+    contact = await seed_contact(db_session, organization_id=1, owner_id=1)
+
+    now = datetime.now(tz=UTC)
+    deal_one = Deal(
+        organization_id=1,
+        contact_id=contact.id,
+        owner_id=1,
+        title="Deal One",
+        amount=1000,
+        currency="USD",
+        status=DealStatus.NEW,
+        stage=DealStage.QUALIFICATION,
+        created_at=now,
+        updated_at=now,
+    )
+    deal_two = Deal(
+        organization_id=1,
+        contact_id=contact.id,
+        owner_id=1,
+        title="Deal Two",
+        amount=2000,
+        currency="USD",
+        status=DealStatus.NEW,
+        stage=DealStage.QUALIFICATION,
+        created_at=now,
+        updated_at=now,
+    )
+    db_session.add_all([deal_one, deal_two])
+    await db_session.commit()
+    await db_session.refresh(deal_one)
+    await db_session.refresh(deal_two)
+
+    tasks = [
+        Task(
+            deal_id=deal_one.id,
+            title="Deal One Open",
+            description=None,
+            due_date=now + timedelta(days=1),
+            is_done=False,
+        ),
+        Task(
+            deal_id=deal_one.id,
+            title="Deal One Done",
+            description=None,
+            due_date=now + timedelta(days=2),
+            is_done=True,
+        ),
+        Task(
+            deal_id=deal_two.id,
+            title="Deal Two Open",
+            description=None,
+            due_date=now + timedelta(days=3),
+            is_done=False,
+        ),
+    ]
+    db_session.add_all(tasks)
+    await db_session.commit()
+
+    response = await api_client.get(
+        "/api/v1/tasks",
+        params={"deal_id": deal_one.id, "only_open": "true"},
+        headers=HEADERS,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["title"] == "Deal One Open"
+    assert data[0]["deal_id"] == deal_one.id
+
+
+@pytest.mark.asyncio
+async def test_list_tasks_filters_by_due_range(
+    api_client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await seed_user_and_org(db_session)
+    await seed_organization_member(db_session, user_id=1, organization_id=1, role=UserRole.OWNER)
+    await seed_contact(db_session, organization_id=1, owner_id=1)
+    deal = await seed_deal(db_session, organization_id=1, contact_id=1, owner_id=1)
+
+    now = datetime.now(tz=UTC)
+    tasks = [
+        Task(
+            deal_id=deal.id,
+            title="Past Task",
+            description=None,
+            due_date=now - timedelta(days=1),
+            is_done=False,
+        ),
+        Task(
+            deal_id=deal.id,
+            title="Window Task",
+            description=None,
+            due_date=now + timedelta(days=2),
+            is_done=False,
+        ),
+        Task(
+            deal_id=deal.id,
+            title="Future Task",
+            description=None,
+            due_date=now + timedelta(days=10),
+            is_done=False,
+        ),
+        Task(
+            deal_id=deal.id,
+            title="No Due Date",
+            description=None,
+            due_date=None,
+            is_done=False,
+        ),
+    ]
+    db_session.add_all(tasks)
+    await db_session.commit()
+
+    due_after = (now + timedelta(hours=12)).isoformat().replace("+00:00", "Z")
+    due_before = (now + timedelta(days=5)).isoformat().replace("+00:00", "Z")
+    response = await api_client.get(
+        "/api/v1/tasks",
+        params={"due_after": due_after, "due_before": due_before},
+        headers=HEADERS,
+    )
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data) == 1
+    assert data[0]["title"] == "Window Task"
