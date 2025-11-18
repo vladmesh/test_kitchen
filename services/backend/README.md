@@ -25,7 +25,7 @@ services/backend
 - `make up` / `make down` – поднять/остановить dev-стек (backend + postgres + redis).
 - `make shell` – внутри контейнера backend.
 - `make tests` – тестовый стек через `infra/docker-compose.test.yml`.
-- `make lint`, `make typecheck`, `make format` – линтеры/типизация/формат в `infra/Dockerfile.tools`.
+- `make lint`, `make format` – линтеры/типизация (ruff + mypy) и формат в `infra/Dockerfile.tools`.
 - `make migrate`, `make makemigration name=msg` – работа с Alembic.
 
 Все команды запускаются внутри контейнеров; локальные `poetry install`, `pytest`, `ruff` и т.п. не используются.

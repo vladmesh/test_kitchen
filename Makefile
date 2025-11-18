@@ -2,7 +2,7 @@ COMPOSE ?= docker compose
 DEV_COMPOSE := infra/docker-compose.dev.yml
 TEST_COMPOSE := infra/docker-compose.test.yml
 
-.PHONY: help up down logs restart ps shell test tests lint typecheck format migrate makemigration
+.PHONY: help up down logs restart ps shell test tests lint format migrate makemigration
 
 help:
 	@echo "Available targets:"
@@ -11,7 +11,6 @@ help:
 	@echo "  make logs      # Tail dev logs"
 	@echo "  make tests     # Run backend test suite (docker only)"
 	@echo "  make lint      # Run ruff lint and mypy"
-	@echo "  make typecheck # Run mypy type checks"
 	@echo "  make format    # Auto-format via ruff"
 	@echo "  make migrate   # Run Alembic migrations"
 	@echo "  make makemigration name=msg # Autogenerate Alembic revision"
@@ -43,10 +42,6 @@ tests:
 lint:
 	docker build -f infra/Dockerfile.tools -t test-kitchen-tools .
 	docker run --rm -v $(PWD):/workspace test-kitchen-tools sh -c "ruff check services && mypy services/backend/src"
-
-typecheck:
-	docker build -f infra/Dockerfile.tools -t test-kitchen-tools .
-	docker run --rm -v $(PWD):/workspace test-kitchen-tools sh -c "mypy services/backend/src"
 
 format:
 	docker build -f infra/Dockerfile.tools -t test-kitchen-tools .

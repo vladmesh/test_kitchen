@@ -35,10 +35,9 @@ make up
 # Stop everything
 make down
 
-# Run tests / lint / mypy inside Docker
+# Run tests / lint (ruff + mypy) inside Docker
 make tests   # docker compose test stack
 make lint
-make typecheck
 ```
 
 Detailed service-specific instructions live in `services/backend/README.md`.
